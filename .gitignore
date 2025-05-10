@@ -1,0 +1,33 @@
+# 🐍 Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.log
+
+# 📁 Virtual environment
+venv/
+env/
+
+# 📄 Compiled ANTLR files
+*.interp
+*.tokens
+*.class
+*.jar
+
+# 📤 Output files
+tokens.txt
+symbol_table.txt
+lexical_errors.txt
+
+# 📂 IDE/editor settings
+.idea/
+.vscode/
+*.swp
+
+# 🗃️ OS-specific
+.DS_Store
+Thumbs.db
+
+# 🚀 Misc
+antlr-*.jar
+
