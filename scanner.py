@@ -23,13 +23,17 @@ class ANTLRScanner:
         token_line = token.line
 
         # Handle error tokens
-        if token_type == "ERROR":
+        if token_type == "INVALID":
             self.lexical_errors.append(f"{token_line}\t({token_text}, Invalid input)")
             return None
 
         # Handle invalid comment (you may define this in grammar too)
         if token_type == "UnclosedComment":
             self.lexical_errors.append(f"{token_line}\t({token_text}, Unclosed comment)")
+            return None
+        
+        if token_type == "UNMATCHED_COMMENT":
+            self.lexical_errors.append(f"{token_line}\t({token_text}, Unmatched comment)")
             return None
 
         # Track IDs in symbol table
