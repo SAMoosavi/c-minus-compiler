@@ -32,7 +32,7 @@ DIV      : '/';
 COMMENT  : '/*' .*? '*/' -> skip;
 
 // Whitespace
-WS       : [ \t\r\n\v\f]+ -> skip;
+WS       : [ \t\r\n\f]+ -> skip;
 
 // Identifiers and numbers
 ID       : [A-Za-z][A-Za-z0-9]*;
