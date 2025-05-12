@@ -1,115 +1,115 @@
-
 import re
 
 keywords = {'if', 'else', 'void', 'int', 'repeat', 'break', 'until', 'return'}
 symbols = {';', ',', '[', ']', '(', ')', '{', '}', '+', '-', '*', '=', '<', '=='}
 symbol_set = set(';,[](){}+-*=</')
 
-token_output = []
-lexical_errors = []
 symbol_table = []
 symbol_table_set = set()
+lexical_errors = []
 
-lineno = 0
+class Scanner:
+    def __init__(self, source_lines):
+        self.lines = source_lines
+        self.lineno = 0
+        self.line = ""
+        self.index = 0
+        self.current_token = None
 
-def add_token(token_type, value):
-    global lineno
-    token_output.append(f"{lineno}\t({token_type}, {value})")
+    def add_to_symbol_table(self, lexeme):
+        if lexeme not in symbol_table_set:
+            symbol_table_set.add(lexeme)
+            symbol_table.append(lexeme)
 
-def add_error(value, msg="Invalid input"):
-    global lineno
-    lexical_errors.append(f"{lineno}\t({value}, {msg})")
+    def get_next_token(self):
+        while self.lineno < len(self.lines):
+            if self.index >= len(self.line):
+                self.line = self.lines[self.lineno]
+                self.lineno += 1
+                self.index = 0
 
-def add_to_symbol_table(lexeme):
-    if lexeme not in symbol_table_set:
-        symbol_table_set.add(lexeme)
-        symbol_table.append(lexeme)
+            while self.index < len(self.line):
+                c = self.line[self.index]
 
-def tokenize_line(line):
-    i = 0
-    while i < len(line):
-        c = line[i]
+                if c.isspace():
+                    self.index += 1
+                    continue
 
-        # Skip whitespace
-        if c.isspace():
-            i += 1
-            continue
+                if c == '/' and self.index+1 < len(self.line) and self.line[self.index+1] == '*':
+                    end = self.line.find('*/', self.index+2)
+                    if end == -1:
+                        snippet = self.line[self.index:self.index+10].replace('\n', '') + ('...' if len(self.line[self.index:]) > 10 else '')
+                        lexical_errors.append(f"{self.lineno}	({snippet}, Unclosed comment)")
+                        self.index = len(self.line)
+                        return self.get_next_token()
+                    else:
+                        self.index = end + 2
+                        continue
 
-        # COMMENT START
-        if c == '/' and i+1 < len(line) and line[i+1] == '*':
-            end = line.find('*/', i+2)
-            if end == -1:
-                snippet = line[i:i+10].replace('\n', '') + ('...' if len(line[i:]) > 10 else '')
-                add_error(snippet, "Unclosed comment")
-                break
-            else:
-                i = end + 2
-                continue
+                if c == '*' and self.index+1 < len(self.line) and self.line[self.index+1] == '/':
+                    lexical_errors.append(f"{self.lineno}	(*/, Unmatched comment)")
+                    self.index += 2
+                    return self.get_next_token()
 
-        # UNMATCHED COMMENT
-        if c == '*' and i+1 < len(line) and line[i+1] == '/':
-            add_error("*/", "Unmatched comment")
-            i += 2
-            continue
+                if c in symbol_set:
+                    if c == '=' and self.index+1 < len(self.line) and self.line[self.index+1] == '=':
+                        self.index += 2
+                        return (self.lineno, ("SYMBOL", "=="))
+                    else:
+                        self.index += 1
+                        return (self.lineno, ("SYMBOL", c))
 
-        # SYMBOLS
-        if c in symbol_set:
-            if c == '=' and i+1 < len(line) and line[i+1] == '=':
-                add_token("SYMBOL", '==')
-                i += 2
-            else:
-                add_token("SYMBOL", c)
-                i += 1
-            continue
+                if c.isdigit():
+                    j = self.index
+                    while j < len(self.line) and self.line[j].isdigit():
+                        j += 1
+                    lexeme = self.line[self.index:j]
+                    if j < len(self.line) and self.line[j].isalpha():
+                        k = j
+                        while k < len(self.line) and self.line[k].isalnum():
+                            k += 1
+                        lexical_errors.append(f"{self.lineno}	({self.line[self.index:k]}, Invalid number)")
+                        self.index = k
+                        return self.get_next_token()
+                    else:
+                        self.index = j
+                        return (self.lineno, ("NUM", lexeme))
 
-        # NUMBER
-        if c.isdigit():
-            j = i
-            while j < len(line) and line[j].isdigit():
-                j += 1
-            lexeme = line[i:j]
-            if j < len(line) and line[j].isalpha():
-                k = j
-                while k < len(line) and line[k].isalnum():
-                    k += 1
-                add_error(line[i:k], "Invalid number")
-                i = k
-            else:
-                add_token("NUM", lexeme)
-                i = j
-            continue
+                if c.isalpha():
+                    j = self.index
+                    while j < len(self.line) and self.line[j].isalnum():
+                        j += 1
+                    lexeme = self.line[self.index:j]
+                    self.index = j
+                    if lexeme in keywords:
+                        return (self.lineno, ("KEYWORD", lexeme))
+                    else:
+                        self.add_to_symbol_table(lexeme)
+                        return (self.lineno, ("ID", lexeme))
 
-        # IDENTIFIER or KEYWORD
-        if c.isalpha():
-            j = i
-            while j < len(line) and line[j].isalnum():
-                j += 1
-            lexeme = line[i:j]
-            if lexeme in keywords:
-                add_token("KEYWORD", lexeme)
-            else:
-                add_token("ID", lexeme)
-                add_to_symbol_table(lexeme)
-            i = j
-            continue
+                lexical_errors.append(f"{self.lineno}	({c}, Invalid input)")
+                self.index += 1
+                return self.get_next_token()
 
-        # Invalid character
-        add_error(c, "Invalid input")
-        i += 1
+        return None  # End of file
 
 def main():
-    global lineno
     with open("input.txt", "r", encoding="utf-8") as f:
-        for line in f:
-            lineno += 1
-            tokenize_line(line)
+        lines = f.readlines()
 
-    # Write token output
+    scanner = Scanner(lines)
+    tokens = []
+
+    while True:
+        tok = scanner.get_next_token()
+        if tok is None:
+            break
+        tokens.append(tok)
+
     with open("tokens.txt", "w", encoding="utf-8") as f:
-        for token in token_output:
-            f.write(token + "\n")
+        for line, (typ, val) in tokens:
+            f.write(f"{line}\t({typ}, {val})\n")
 
-    # Write lexical errors
     with open("lexical_errors.txt", "w", encoding="utf-8") as f:
         if lexical_errors:
             for err in lexical_errors:
@@ -117,10 +117,9 @@ def main():
         else:
             f.write("There is no lexical error.\n")
 
-    # Write symbol table
     with open("symbol_table.txt", "w", encoding="utf-8") as f:
-        for i, entry in enumerate(symbol_table, 1):
-            f.write(f"{i}.\t{entry}\n")
+        for i, sym in enumerate(symbol_table, 1):
+            f.write(f"{i}.	{sym}\n")
 
 if __name__ == "__main__":
     main()
