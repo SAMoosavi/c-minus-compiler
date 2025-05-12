@@ -14,7 +14,9 @@ def main():
     tokens = []
     token = lexer.nextToken()
     while token.type != -1:
-        tokens.append(token)
+        token_type = lexer.symbolicNames[token.type]
+        if token_type != "INVALID":
+            tokens.append(token)
         token = lexer.nextToken()
 
     # Write output
