@@ -118,7 +118,10 @@ def main():
             f.write("There is no lexical error.\n")
 
     with open("symbol_table.txt", "w", encoding="utf-8") as f:
-        for i, sym in enumerate(symbol_table, 1):
+        for i, sym in enumerate(keywords,1):
+            f.write(f"{i}.	{sym}\n")
+
+        for i, sym in enumerate(symbol_table, len(keywords)):
             f.write(f"{i}.	{sym}\n")
 
 if __name__ == "__main__":
