@@ -92,37 +92,3 @@ class Scanner:
                 return self.get_next_token()
 
         return None  # End of file
-
-def main():
-    with open("input.txt", "r", encoding="utf-8") as f:
-        lines = f.readlines()
-
-    scanner = Scanner(lines)
-    tokens = []
-
-    while True:
-        tok = scanner.get_next_token()
-        if tok is None:
-            break
-        tokens.append(tok)
-
-    with open("tokens.txt", "w", encoding="utf-8") as f:
-        for line, (typ, val) in tokens:
-            f.write(f"{line}\t({typ}, {val})\n")
-
-    with open("lexical_errors.txt", "w", encoding="utf-8") as f:
-        if lexical_errors:
-            for err in lexical_errors:
-                f.write(err + "\n")
-        else:
-            f.write("There is no lexical error.\n")
-
-    with open("symbol_table.txt", "w", encoding="utf-8") as f:
-        for i, sym in enumerate(keywords,1):
-            f.write(f"{i}.	{sym}\n")
-
-        for i, sym in enumerate(symbol_table, len(keywords)):
-            f.write(f"{i}.	{sym}\n")
-
-if __name__ == "__main__":
-    main()

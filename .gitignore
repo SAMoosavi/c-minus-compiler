@@ -18,6 +18,8 @@ env/
 tokens.txt
 symbol_table.txt
 lexical_errors.txt
+syntax_errors.txt
+parse_tree.txt
 
 # 📂 IDE/editor settings
 .idea/
