@@ -54,17 +54,17 @@ class Parser:
 
         return ans
 
-    def print_tree(self, d, prefix="", is_last=True):
+    def print_tree(self, d, prefix=""):
         out = []
         keys = list(d.keys())
         for i, key in enumerate(keys):
             is_terminal = len(d[key]) == 0
             is_last_key = i == len(keys) - 1
             branch = "└── " if is_last_key else "├── "
-            connector = "    " if is_last and is_last_key else "│   "
+            connector = "    " if is_last_key else "│   "
             out.append(f"{prefix}{branch}{key}")
             if not is_terminal:
-                out.extend(self.print_tree(d[key], prefix + connector, is_last_key))
+                out.extend(self.print_tree(d[key], prefix + connector))
         return out
 
     def match(self, expected_type, expected_lexeme=None):
@@ -94,8 +94,9 @@ class Parser:
     def parse(self):
         self.indent("Program")
         self.Program()
+        self.indent("$")
         self.dedent()
-        self.output.append("$")
+        self.dedent()
         return f"Program\n{"\n".join(self.print_tree(self.parse_tree()['Program']))}"
 
     # Grammar Rule: Program → Declaration-list
@@ -256,6 +257,7 @@ class Parser:
             self.match("KEYWORD", "return")
             self.indent("Return-stmt-prime")
             self.Return_stmt_prime()
+            self.dedent()
             self.dedent()
         elif self.lookahead[1][1] == '{':
             self.indent("Compound-stmt")
@@ -465,7 +467,14 @@ class Parser:
             self.Args()
             self.dedent()
             self.match("SYMBOL", ")")
-        elif self.lookahead[1][1] == '[':
+        else:
+            self.indent("Var-prime")
+            self.Var_prime()
+            self.dedent()
+            
+
+    def Var_prime(self):
+        if self.lookahead[1][1] == '[':
             self.match("SYMBOL", "[")
             self.indent("Expression")
             self.Expression()
