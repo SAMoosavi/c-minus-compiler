@@ -8,7 +8,7 @@ def main():
 
     scanner = Scanner(lines)
     parser = Parser(scanner)
-    parser.parse()
+    parse_tree_lines = parser.parse()
 
     with open("parse_tree.txt", "w", encoding="utf-8") as f:
         for line in parse_tree_lines:

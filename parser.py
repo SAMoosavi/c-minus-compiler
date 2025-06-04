@@ -1,246 +1,188 @@
-from scanner import Scanner
-from shared import add_tree_line, add_syntax_error, parse_tree_lines, syntax_errors
-
 class Parser:
     def __init__(self, scanner):
         self.scanner = scanner
         self.lookahead = self.scanner.get_next_token()
+        self.output = []
+        self.indent_level = 0
 
-    def match(self, expected_type, expected_value=None):
-        if self.lookahead is None:
+    def match(self, expected_type, expected_lexeme=None):
+        token = self.lookahead
+        if token == '$':
+            self.syntax_error("Unexpected EOF")
             return
 
-        lineno, (token_type, token_value) = self.lookahead
-        if token_type == expected_type and (expected_value is None or token_value == expected_value):
-            matched = self.lookahead
+        _, (tok_type, lexeme) = token
+
+        if tok_type == expected_type and (expected_lexeme is None or lexeme == expected_lexeme):
+            self.output.append(self.format_token(tok_type, lexeme))
             self.lookahead = self.scanner.get_next_token()
-            return matched
         else:
-            expected = expected_value if expected_value else expected_type
-            add_syntax_error(lineno, f"{lineno}\tsyntax error, missing {expected}")
-            self.lookahead = self.scanner.get_next_token()
-            return None
+            self.syntax_error(f"Expected {expected_type}('{expected_lexeme}') but got {tok_type}('{lexeme}')")
+
+    def format_token(self, tok_type, lexeme):
+        return "\t" * self.indent_level + f"({tok_type}, {lexeme})"
+
+    def syntax_error(self, msg):
+        raise SyntaxError(f"Syntax error: {msg}")
 
     def parse(self):
-        self.program(0)
+        self.output.append("Program")
+        self.Program()
+        self.output.append("$")
+        return self.output
 
-    def program(self, depth):
-        add_tree_line(depth, "Program")
-        self.declaration_list(depth + 1)
+    # Grammar Rule: Program → Declaration-list
+    def Program(self):
+        self.indent("Declaration-list")
+        self.Declaration_list()
+        self.dedent()
 
-    def declaration_list(self, depth):
-        add_tree_line(depth, "Declaration-list")
-        while self.lookahead and (self.lookahead[1][0] == "KEYWORD" and self.lookahead[1][1] in {"int", "void"}):
-            self.declaration(depth + 1)
+    def Declaration_list(self):
+        if self.lookahead == '$' or self.lookahead[1][1] not in ("int", "void"):
+            self.indent("epsilon")
+            self.dedent()
+            return
+        self.indent("Declaration")
+        self.Declaration()
+        self.dedent()
+        self.indent("Declaration-list")
+        self.Declaration_list()
+        self.dedent()
 
-    def declaration(self, depth):
-        add_tree_line(depth, "Declaration")
-        self.declaration_initial(depth + 1)
-        self.declaration_prime(depth + 1)
+    def Declaration(self):
+        self.indent("Declaration-initial")
+        self.Declaration_initial()
+        self.dedent()
+        self.indent("Declaration-prime")
+        self.Declaration_prime()
+        self.dedent()
 
-    def declaration_initial(self, depth):
-        add_tree_line(depth, "Declaration-initial")
-        self.type_specifier(depth + 1)
+    def Declaration_initial(self):
+        self.indent("Type-specifier")
+        self.Type_specifier()
+        self.dedent()
         self.match("ID")
 
-    def declaration_prime(self, depth):
-        add_tree_line(depth, "Declaration-prime")
-        if self.lookahead and self.lookahead[1][1] == '(':
-            self.fun_declaration_prime(depth + 1)
-        else:
-            self.var_declaration_prime(depth + 1)
-
-    def type_specifier(self, depth):
-        add_tree_line(depth, "Type-specifier")
-        if self.lookahead and self.lookahead[1][1] in {"int", "void"}:
-            self.match("KEYWORD", self.lookahead[1][1])
-        else:
-            add_syntax_error(self.lookahead[0], f"{self.lookahead[0]}\tsyntax error, missing type")
-            self.lookahead = self.scanner.get_next_token()
-
-    def var_declaration_prime(self, depth):
-        add_tree_line(depth, "Var-declaration-prime")
-        if self.lookahead and self.lookahead[1][1] == '[':
-            self.match("SYMBOL", "[")
-            self.match("NUM")
-            self.match("SYMBOL", "]")
+    def Declaration_prime(self):
+        if self.lookahead[1][1] == '(':  # Fun-declaration-prime
+            self.indent("Fun-declaration-prime")
+            self.match("SYMBOL", "(")
+            self.indent("Params")
+            self.Params()
+            self.dedent()
+            self.match("SYMBOL", ")")
+            self.indent("Compound-stmt")
+            self.Compound_stmt()
+            self.dedent()
+            self.dedent()
+        else:  # Var-declaration-prime
+            self.indent("Var-declaration-prime")
+            if self.lookahead[1][1] == '[':
+                self.match("SYMBOL", "[")
+                self.match("NUM")
+                self.match("SYMBOL", "]")
             self.match("SYMBOL", ";")
+            self.dedent()
+
+    def Type_specifier(self):
+        if self.lookahead[1][1] in ("int", "void"):
+            self.match("KEYWORD")
         else:
-            self.match("SYMBOL", ";")
+            self.syntax_error("Expected type specifier")
 
-    def fun_declaration_prime(self, depth):
-        add_tree_line(depth, "Fun-declaration-prime")
-        self.match("SYMBOL", "(")
-        self.params(depth + 1)
-        self.match("SYMBOL", ")")
-        self.compound_stmt(depth + 1)
-
-    def params(self, depth):
-        add_tree_line(depth, "Params")
-        if self.lookahead and self.lookahead[1][1] == "void":
+    def Params(self):
+        if self.lookahead[1][1] == "void":
             self.match("KEYWORD", "void")
         else:
             self.match("KEYWORD", "int")
             self.match("ID")
-            self.param_prime(depth + 1)
-            self.param_list(depth + 1)
+            self.indent("Param-prime")
+            self.Param_prime()
+            self.dedent()
+            self.indent("Param-list")
+            self.Param_list()
+            self.dedent()
 
-    def param_prime(self, depth):
-        add_tree_line(depth, "Param-prime")
-        if self.lookahead and self.lookahead[1][1] == "[":
+    def Param_prime(self):
+        if self.lookahead[1][1] == '[':
             self.match("SYMBOL", "[")
             self.match("SYMBOL", "]")
+        else:
+            self.indent("epsilon")
+            self.dedent()
 
-    def param_list(self, depth):
-        add_tree_line(depth, "Param-list")
-        while self.lookahead and self.lookahead[1][1] == ",":
+    def Param_list(self):
+        if self.lookahead[1][1] == ',':
             self.match("SYMBOL", ",")
-            self.param(depth + 1)
+            self.indent("Param")
+            self.Param()
+            self.dedent()
+            self.indent("Param-list")
+            self.Param_list()
+            self.dedent()
+        else:
+            self.indent("epsilon")
+            self.dedent()
 
-    def param(self, depth):
-        add_tree_line(depth, "Param")
-        self.declaration_initial(depth + 1)
-        self.param_prime(depth + 1)
+    def Param(self):
+        self.indent("Declaration-initial")
+        self.Declaration_initial()
+        self.dedent()
+        self.indent("Param-prime")
+        self.Param_prime()
+        self.dedent()
 
-    def compound_stmt(self, depth):
-        add_tree_line(depth, "Compound-stmt")
+    def Compound_stmt(self):
         self.match("SYMBOL", "{")
-        self.declaration_list(depth + 1)
-        self.statement_list(depth + 1)
+        self.indent("Declaration-list")
+        self.Declaration_list()
+        self.dedent()
+        self.indent("Statement-list")
+        self.Statement_list()
+        self.dedent()
         self.match("SYMBOL", "}")
 
-    def statement_list(self, depth):
-        add_tree_line(depth, "Statement-list")
-        while self.lookahead and self.lookahead[1][0] in {"KEYWORD", "ID", "NUM", "SYMBOL"}:
-            self.statement(depth + 1)
-
-    def statement(self, depth):
-        add_tree_line(depth, "Statement")
-        token = self.lookahead[1][1] if self.lookahead else None
-        if token == "{":
-            self.compound_stmt(depth + 1)
-        elif token == "if":
-            self.selection_stmt(depth + 1)
-        elif token == "repeat":
-            self.iteration_stmt(depth + 1)
-        elif token == "return":
-            self.return_stmt(depth + 1)
-        elif token == "break" or token == ";" or token == "(" or (self.lookahead and self.lookahead[1][0] in {"ID", "NUM"}):
-            self.expression_stmt(depth + 1)
+    def Statement_list(self):
+        if self.lookahead[1][1] in ('if', 'repeat', 'return', 'break', '{') or self.lookahead[0] != '$' or self.lookahead[1][0] in ('ID', 'NUM', '('):
+            self.indent("Statement")
+            self.Statement()
+            self.dedent()
+            self.indent("Statement-list")
+            self.Statement_list()
+            self.dedent()
         else:
-            self.expression_stmt(depth + 1)
+            self.indent("epsilon")
+            self.dedent()
 
-    def expression_stmt(self, depth):
-        add_tree_line(depth, "Expression-stmt")
-        if self.lookahead and self.lookahead[1][1] == "break":
+    def Statement(self):
+        self.indent("Expression-stmt")
+        self.Expression_stmt()
+        self.dedent()
+
+    def Expression_stmt(self):
+        if self.lookahead[1][1] == 'break':
             self.match("KEYWORD", "break")
             self.match("SYMBOL", ";")
-        elif self.lookahead and self.lookahead[1][1] == ";":
+        elif self.lookahead[1][1] == ';':
             self.match("SYMBOL", ";")
         else:
-            self.expression(depth + 1)
+            self.indent("Expression")
+            self.Expression()
+            self.dedent()
             self.match("SYMBOL", ";")
 
-    def selection_stmt(self, depth):
-        add_tree_line(depth, "Selection-stmt")
-        self.match("KEYWORD", "if")
-        self.match("SYMBOL", "(")
-        self.expression(depth + 1)
-        self.match("SYMBOL", ")")
-        self.statement(depth + 1)
-        self.match("KEYWORD", "else")
-        self.statement(depth + 1)
+    def Expression(self):
+        self.match("ID")  # simplified
+        if self.lookahead[1][1] == '=':
+            self.match("SYMBOL", "=")
+            self.indent("Expression")
+            self.Expression()
+            self.dedent()
 
-    def iteration_stmt(self, depth):
-        add_tree_line(depth, "Iteration-stmt")
-        self.match("KEYWORD", "repeat")
-        self.statement(depth + 1)
-        self.match("KEYWORD", "until")
-        self.match("SYMBOL", "(")
-        self.expression(depth + 1)
-        self.match("SYMBOL", ")")
+    # Utility functions to help with indentation for parse tree output
+    def indent(self, label):
+        self.output.append("\t" * self.indent_level + label)
+        self.indent_level += 1
 
-    def return_stmt(self, depth):
-        add_tree_line(depth, "Return-stmt")
-        self.match("KEYWORD", "return")
-        self.return_stmt_prime(depth + 1)
-
-    def return_stmt_prime(self, depth):
-        add_tree_line(depth, "Return-stmt-prime")
-        if self.lookahead and self.lookahead[1][1] == ";":
-            self.match("SYMBOL", ";")
-        else:
-            self.expression(depth + 1)
-            self.match("SYMBOL", ";")
-
-    def expression(self, depth):
-        add_tree_line(depth, "Expression")
-        self.simple_expression_zegond(depth + 1)
-
-    def simple_expression_zegond(self, depth):
-        add_tree_line(depth, "Simple-expression-zegond")
-        self.additive_expression_zegond(depth + 1)
-        self.C(depth + 1)
-
-    def additive_expression_zegond(self, depth):
-        add_tree_line(depth, "Additive-expression-zegond")
-        self.term_zegond(depth + 1)
-        self.D(depth + 1)
-
-    def term_zegond(self, depth):
-        add_tree_line(depth, "Term-zegond")
-        self.factor_zegond(depth + 1)
-        self.G(depth + 1)
-
-    def factor_zegond(self, depth):
-        add_tree_line(depth, "Factor-zegond")
-        if self.lookahead and self.lookahead[1][1] == "(":
-            self.match("SYMBOL", "(")
-            self.expression(depth + 1)
-            self.match("SYMBOL", ")")
-        else:
-            self.match("NUM")
-
-    def C(self, depth):
-        add_tree_line(depth, "C")
-        if self.lookahead and self.lookahead[1][1] in {"<", "=="}:
-            self.match("SYMBOL", self.lookahead[1][1])
-            self.additive_expression(depth + 1)
-        else:
-            add_tree_line(depth + 1, "EPSILON")
-
-    def D(self, depth):
-        add_tree_line(depth, "D")
-        while self.lookahead and self.lookahead[1][1] in {"+", "-"}:
-            self.match("SYMBOL", self.lookahead[1][1])
-            self.term(depth + 1)
-
-    def additive_expression(self, depth):
-        add_tree_line(depth, "Additive-expression")
-        self.term(depth + 1)
-        self.D(depth + 1)
-
-    def term(self, depth):
-        add_tree_line(depth, "Term")
-        self.factor(depth + 1)
-        self.G(depth + 1)
-
-    def factor(self, depth):
-        add_tree_line(depth, "Factor")
-        if self.lookahead and self.lookahead[1][1] == "(":
-            self.match("SYMBOL", "(")
-            self.expression(depth + 1)
-            self.match("SYMBOL", ")")
-        elif self.lookahead and self.lookahead[1][0] == "ID":
-            self.match("ID")
-        elif self.lookahead and self.lookahead[1][0] == "NUM":
-            self.match("NUM")
-        else:
-            add_syntax_error(self.lookahead[0], f"{self.lookahead[0]}\tsyntax error, illegal factor")
-            self.lookahead = self.scanner.get_next_token()
-
-    def G(self, depth):
-        add_tree_line(depth, "G")
-        while self.lookahead and self.lookahead[1][1] == "*":
-            self.match("SYMBOL", "*")
-            self.factor(depth + 1)
+    def dedent(self):
+        self.indent_level -= 1
