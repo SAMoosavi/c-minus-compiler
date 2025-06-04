@@ -91,4 +91,4 @@ class Scanner:
                 self.index += 1
                 return self.get_next_token()
 
-        return None  # End of file
+        return '$'  # End of file
