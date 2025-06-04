@@ -188,11 +188,8 @@ class Parser:
         elif la == 'return':
             self.indent("Return-stmt")
             self.match("KEYWORD", "return")
-            if self.lookahead[1][1] != ';':
-                self.indent("Expression")
-                self.Expression()
-                self.dedent()
-            self.match("SYMBOL", ";")
+            self.indent("Return-stmt-prime")
+            self.Return_stmt_prime()
             self.dedent()
         elif la == '{':
             self.indent("Compound-stmt")
@@ -202,6 +199,14 @@ class Parser:
             self.indent("Expression-stmt")
             self.Expression_stmt()
             self.dedent()
+    
+    def Return_stmt_prime(self):
+        if self.lookahead[1][1] != ';':
+            self.indent("Expression")
+            self.Expression()
+            self.dedent()
+        else:
+            self.match("SYMBOL", ";")
 
     def Expression_stmt(self):
         if self.lookahead[1][1] == 'break':
@@ -222,18 +227,17 @@ class Parser:
             self.dedent()
         elif self.lookahead[1][0] == "ID":
             self.match("ID")
-            if self.lookahead[1][1] == '=':
-                self.match("SYMBOL", "=")
-                self.indent("Expression")
-                self.Expression()
-                self.dedent()
-            else:
-                self.indent("B")
-                self.B()
-                self.dedent()
+            self.indent("B")
+            self.B()
+            self.dedent()
 
     def B(self):
-        if self.lookahead[1][1] == '[':
+        if self.lookahead[1][1] == '=':
+            self.match("SYMBOL", "=")
+            self.indent("Expression")
+            self.Expression()
+            self.dedent()
+        elif self.lookahead[1][1] == '[':
             self.match("SYMBOL", "[")
             self.indent("Expression")
             self.Expression()
