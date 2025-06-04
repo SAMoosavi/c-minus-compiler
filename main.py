@@ -11,8 +11,7 @@ def main():
     parse_tree_lines = parser.parse()
 
     with open("parse_tree.txt", "w", encoding="utf-8") as f:
-        for line in parse_tree_lines:
-            f.write(line + "\n")
+        f.write(parse_tree_lines)
 
     with open("syntax_errors.txt", "w", encoding="utf-8") as f:
         if syntax_errors:

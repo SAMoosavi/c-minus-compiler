@@ -5,6 +5,68 @@ class Parser:
         self.output = []
         self.indent_level = 0
 
+    def parse_tree(self):
+        lines = self.output
+        stack = []
+        ans = {}
+
+        def get_indent_level(line):
+            return len(line) - len(line.lstrip('\t'))
+
+        stack.append('ROOT')
+
+        for line in lines:
+            level = get_indent_level(line)
+            content:str = line.strip()
+            if level+1 == len(stack):
+                stack.pop()
+                node = ans
+                for k in stack:
+                    node = node[k]
+                
+                if content not in node:
+                    node[content] = {}
+
+                stack.append(content)
+                
+            elif level+1 >= len(stack):
+                node = ans
+                for k in stack:
+                    node = node[k]
+                
+                if content not in node:
+                    node[content] = {}
+
+                stack.append(content)
+            else:
+                while level+1 != len(stack):
+                    stack.pop()
+                
+                stack.pop()
+                node = ans
+                for k in stack:
+                    node = node[k]
+                
+                if content not in node:
+                    node[content] = {}
+
+                stack.append(content)
+
+        return ans
+
+    def print_tree(self, d, prefix="", is_last=True):
+        out = []
+        keys = list(d.keys())
+        for i, key in enumerate(keys):
+            is_terminal = len(d[key]) == 0
+            is_last_key = i == len(keys) - 1
+            branch = "└── " if is_last_key else "├── "
+            connector = "    " if is_last and is_last_key else "│   "
+            out.append(f"{prefix}{branch}{key}")
+            if not is_terminal:
+                out.extend(self.print_tree(d[key], prefix + connector, is_last_key))
+        return out
+
     def match(self, expected_type, expected_lexeme=None):
         token = self.lookahead
         if token == '$':
@@ -29,14 +91,12 @@ class Parser:
     def format_token(self, tok_type, lexeme):
         return "\t" * self.indent_level + f"({tok_type}, {lexeme})"
 
-    def syntax_error(self, msg):
-        raise SyntaxError(f"Syntax error: {msg}")
-
     def parse(self):
-        self.output.append("Program")
+        self.indent("Program")
         self.Program()
+        self.dedent()
         self.output.append("$")
-        return self.output
+        return f"Program\n{"\n".join(self.print_tree(self.parse_tree()['Program']))}"
 
     # Grammar Rule: Program → Declaration-list
     def Program(self):
