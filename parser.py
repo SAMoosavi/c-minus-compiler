@@ -143,7 +143,7 @@ class Parser:
         self.match("SYMBOL", "}")
 
     def Statement_list(self):
-        if self.lookahead[1][1] in ('if', 'repeat', 'return', 'break', '{') or self.lookahead[0] != '$' or self.lookahead[1][0] in ('ID', 'NUM', '('):
+        if self.lookahead[1][1] in ('if', 'repeat', 'return', 'break', '{') or self.lookahead[1][0] in ('ID', 'NUM', '('):
             self.indent("Statement")
             self.Statement()
             self.dedent()
@@ -155,9 +155,53 @@ class Parser:
             self.dedent()
 
     def Statement(self):
-        self.indent("Expression-stmt")
-        self.Expression_stmt()
-        self.dedent()
+        la = self.lookahead[1][1]
+        if la == 'if':
+            self.indent("Selection-stmt")
+            self.match("KEYWORD", "if")
+            self.match("SYMBOL", "(")
+            self.indent("Expression")
+            self.Expression()
+            self.dedent()
+            self.match("SYMBOL", ")")
+            self.indent("Statement")
+            self.Statement()
+            self.dedent()
+            self.match("KEYWORD", "else")
+            self.indent("Statement")
+            self.Statement()
+            self.dedent()
+            self.dedent()
+        elif la == 'repeat':
+            self.indent("Iteration-stmt")
+            self.match("KEYWORD", "repeat")
+            self.indent("Statement")
+            self.Statement()
+            self.dedent()
+            self.match("KEYWORD", "until")
+            self.match("SYMBOL", "(")
+            self.indent("Expression")
+            self.Expression()
+            self.dedent()
+            self.match("SYMBOL", ")")
+            self.dedent()
+        elif la == 'return':
+            self.indent("Return-stmt")
+            self.match("KEYWORD", "return")
+            if self.lookahead[1][1] != ';':
+                self.indent("Expression")
+                self.Expression()
+                self.dedent()
+            self.match("SYMBOL", ";")
+            self.dedent()
+        elif la == '{':
+            self.indent("Compound-stmt")
+            self.Compound_stmt()
+            self.dedent()
+        else:
+            self.indent("Expression-stmt")
+            self.Expression_stmt()
+            self.dedent()
 
     def Expression_stmt(self):
         if self.lookahead[1][1] == 'break':
@@ -172,12 +216,260 @@ class Parser:
             self.match("SYMBOL", ";")
 
     def Expression(self):
-        self.match("ID")  # simplified
+        if self.lookahead[1][0] == "NUM" or self.lookahead[1][1] == "(":
+            self.indent("Simple-expression-zegond")
+            self.Simple_expression_zegond()
+            self.dedent()
+        elif self.lookahead[1][0] == "ID":
+            self.match("ID")
+            if self.lookahead[1][1] == '=':
+                self.match("SYMBOL", "=")
+                self.indent("Expression")
+                self.Expression()
+                self.dedent()
+            else:
+                self.indent("B")
+                self.B()
+                self.dedent()
+
+    def B(self):
+        if self.lookahead[1][1] == '[':
+            self.match("SYMBOL", "[")
+            self.indent("Expression")
+            self.Expression()
+            self.dedent()
+            self.match("SYMBOL", "]")
+            self.indent("H")
+            self.H()
+            self.dedent()
+        else:
+            self.indent("Simple-expression-prime")
+            self.Simple_expression_prime()
+            self.dedent()
+
+    def H(self):
         if self.lookahead[1][1] == '=':
             self.match("SYMBOL", "=")
             self.indent("Expression")
             self.Expression()
             self.dedent()
+        else:
+            self.indent("G")
+            self.G()
+            self.dedent()
+            self.indent("D")
+            self.D()
+            self.dedent()
+            self.indent("C")
+            self.C()
+            self.dedent()
+
+    def Simple_expression_prime(self):
+        self.indent("Additive-expression-prime")
+        self.Additive_expression_prime()
+        self.dedent()
+        self.indent("C")
+        self.C()
+        self.dedent()
+
+    def Additive_expression_prime(self):
+        self.indent("Term-prime")
+        self.Term_prime()
+        self.dedent()
+        self.indent("D")
+        self.D()
+        self.dedent()
+
+    def C(self):
+        if self.lookahead[1][1] in ('<', '=='):
+            self.indent("Relop")
+            self.Relop()
+            self.dedent()
+            self.indent("Additive-expression")
+            self.Additive_expression()
+            self.dedent()
+        else:
+            self.indent("epsilon")
+            self.dedent()
+
+    def Relop(self):
+        if self.lookahead[1][1] == '<':
+            self.match("SYMBOL", "<")
+        elif self.lookahead[1][1] == '==':
+            self.match("SYMBOL", "==")
+        else:
+            self.syntax_error("Expected relational operator")
+
+    def Additive_expression(self):
+        self.indent("Term")
+        self.Term()
+        self.dedent()
+        self.indent("D")
+        self.D()
+        self.dedent()
+
+    def D(self):
+        if self.lookahead[1][1] in ('+', '-'):
+            self.indent("Addop")
+            self.Addop()
+            self.dedent()
+            self.indent("Term")
+            self.Term()
+            self.dedent()
+            self.indent("D")
+            self.D()
+            self.dedent()
+        else:
+            self.indent("epsilon")
+            self.dedent()
+
+    def Addop(self):
+        if self.lookahead[1][1] == '+':
+            self.match("SYMBOL", "+")
+        elif self.lookahead[1][1] == '-':
+            self.match("SYMBOL", "-")
+        else:
+            self.syntax_error("Expected additive operator")
+
+    def Term(self):
+        self.indent("Factor")
+        self.Factor()
+        self.dedent()
+        self.indent("G")
+        self.G()
+        self.dedent()
+
+    def Term_prime(self):
+        self.indent("Factor-prime")
+        self.Factor_prime()
+        self.dedent()
+        self.indent("G")
+        self.G()
+        self.dedent()
+
+    def G(self):
+        if self.lookahead[1][1] == '*':
+            self.match("SYMBOL", "*")
+            self.indent("Factor")
+            self.Factor()
+            self.dedent()
+            self.indent("G")
+            self.G()
+            self.dedent()
+        else:
+            self.indent("epsilon")
+            self.dedent()
+
+    def Factor(self):
+        if self.lookahead[1][1] == '(':
+            self.match("SYMBOL", "(")
+            self.indent("Expression")
+            self.Expression()
+            self.dedent()
+            self.match("SYMBOL", ")")
+        elif self.lookahead[1][0] == "ID":
+            self.match("ID")
+            self.indent("Var-call-prime")
+            self.Var_call_prime()
+            self.dedent()
+        elif self.lookahead[1][0] == "NUM":
+            self.match("NUM")
+        else:
+            self.syntax_error("Invalid factor")
+
+    def Factor_prime(self):
+        if self.lookahead[1][1] == '(':
+            self.match("SYMBOL", "(")
+            self.indent("Args")
+            self.Args()
+            self.dedent()
+            self.match("SYMBOL", ")")
+        else:
+            self.indent("epsilon")
+            self.dedent()
+
+    def Var_call_prime(self):
+        if self.lookahead[1][1] == '(':
+            self.match("SYMBOL", "(")
+            self.indent("Args")
+            self.Args()
+            self.dedent()
+            self.match("SYMBOL", ")")
+        elif self.lookahead[1][1] == '[':
+            self.match("SYMBOL", "[")
+            self.indent("Expression")
+            self.Expression()
+            self.dedent()
+            self.match("SYMBOL", "]")
+        else:
+            self.indent("epsilon")
+            self.dedent()
+
+    def Args(self):
+        if self.lookahead[1][1] != ')':
+            self.indent("Arg-list")
+            self.Arg_list()
+            self.dedent()
+        else:
+            self.indent("epsilon")
+            self.dedent()
+
+    def Arg_list(self):
+        self.indent("Expression")
+        self.Expression()
+        self.dedent()
+        self.indent("Arg-list-prime")
+        self.Arg_list_prime()
+        self.dedent()
+
+    def Arg_list_prime(self):
+        if self.lookahead[1][1] == ',':
+            self.match("SYMBOL", ",")
+            self.indent("Expression")
+            self.Expression()
+            self.dedent()
+            self.indent("Arg-list-prime")
+            self.Arg_list_prime()
+            self.dedent()
+        else:
+            self.indent("epsilon")
+            self.dedent()
+
+    def Simple_expression_zegond(self):
+        self.indent("Additive-expression-zegond")
+        self.Additive_expression_zegond()
+        self.dedent()
+        self.indent("C")
+        self.C()
+        self.dedent()
+
+    def Additive_expression_zegond(self):
+        self.indent("Term-zegond")
+        self.Term_zegond()
+        self.dedent()
+        self.indent("D")
+        self.D()
+        self.dedent()
+
+    def Term_zegond(self):
+        self.indent("Factor-zegond")
+        self.Factor_zegond()
+        self.dedent()
+        self.indent("G")
+        self.G()
+        self.dedent()
+
+    def Factor_zegond(self):
+        if self.lookahead[1][1] == '(':
+            self.match("SYMBOL", "(")
+            self.indent("Expression")
+            self.Expression()
+            self.dedent()
+            self.match("SYMBOL", ")")
+        elif self.lookahead[1][0] == "NUM":
+            self.match("NUM")
+        else:
+            self.syntax_error("Expected '(' or NUM in Factor-zegond")
 
     # Utility functions to help with indentation for parse tree output
     def indent(self, label):
