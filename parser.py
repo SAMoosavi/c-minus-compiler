@@ -19,6 +19,13 @@ class Parser:
         else:
             self.syntax_error(f"Expected {expected_type}('{expected_lexeme}') but got {tok_type}('{lexeme}')")
 
+    def indent(self, label):
+        self.output.append("\t" * self.indent_level + label)
+        self.indent_level += 1
+
+    def dedent(self):
+        self.indent_level -= 1
+
     def format_token(self, tok_type, lexeme):
         return "\t" * self.indent_level + f"({tok_type}, {lexeme})"
 
@@ -155,8 +162,7 @@ class Parser:
             self.dedent()
 
     def Statement(self):
-        la = self.lookahead[1][1]
-        if la == 'if':
+        if self.lookahead[1][1] == 'if':
             self.indent("Selection-stmt")
             self.match("KEYWORD", "if")
             self.match("SYMBOL", "(")
@@ -172,7 +178,7 @@ class Parser:
             self.Statement()
             self.dedent()
             self.dedent()
-        elif la == 'repeat':
+        elif self.lookahead[1][1] == 'repeat':
             self.indent("Iteration-stmt")
             self.match("KEYWORD", "repeat")
             self.indent("Statement")
@@ -185,13 +191,13 @@ class Parser:
             self.dedent()
             self.match("SYMBOL", ")")
             self.dedent()
-        elif la == 'return':
+        elif self.lookahead[1][1] == 'return':
             self.indent("Return-stmt")
             self.match("KEYWORD", "return")
             self.indent("Return-stmt-prime")
             self.Return_stmt_prime()
             self.dedent()
-        elif la == '{':
+        elif self.lookahead[1][1] == '{':
             self.indent("Compound-stmt")
             self.Compound_stmt()
             self.dedent()
@@ -474,11 +480,3 @@ class Parser:
             self.match("NUM")
         else:
             self.syntax_error("Expected '(' or NUM in Factor-zegond")
-
-    # Utility functions to help with indentation for parse tree output
-    def indent(self, label):
-        self.output.append("\t" * self.indent_level + label)
-        self.indent_level += 1
-
-    def dedent(self):
-        self.indent_level -= 1
