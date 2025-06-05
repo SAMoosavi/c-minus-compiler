@@ -4,6 +4,7 @@ class Parser:
         self.lookahead = self.scanner.get_next_token()
         self.output = []
         self.indent_level = 0
+        self.syntax_errors = ""
 
     def parse_tree(self):
         lines = self.output
@@ -66,6 +67,15 @@ class Parser:
             if not is_terminal:
                 out.extend(self.print_tree(d[key], prefix + connector))
         return out
+    
+    def syntax_error(self, error):
+        self.syntax_errors += error + "\n"
+        while(self.lookahead != '$'):
+            lineno, (tok_type, lexeme) = self.lookahead
+            self.syntax_errors += (f"#{lineno} : syntax error, illegal {lexeme} \n")
+            self.lookahead = self.scanner.get_next_token()
+        tree = "\n".join(self.print_tree(self.parse_tree()['Program']))
+        raise SyntaxError((self.syntax_errors, tree))
 
     def match(self, expected_type, expected_lexeme=None):
         token = self.lookahead
@@ -73,8 +83,7 @@ class Parser:
             self.syntax_error("Unexpected EOF")
             return
 
-        _, (tok_type, lexeme) = token
-
+        lineno, (tok_type, lexeme) = token
         if tok_type == expected_type and (expected_lexeme is None or lexeme == expected_lexeme):
             self.output.append(self.format_token(tok_type, lexeme))
             self.lookahead = self.scanner.get_next_token()
@@ -97,7 +106,8 @@ class Parser:
         self.indent("$")
         self.dedent()
         self.dedent()
-        return f"Program\n{"\n".join(self.print_tree(self.parse_tree()['Program']))}"
+        tree = "\n".join(self.print_tree(self.parse_tree()['Program']))
+        return f"Program\n{tree}", self.syntax_errors
 
     # Grammar Rule: Program → Declaration-list
     def Program(self):
