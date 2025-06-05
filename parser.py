@@ -75,7 +75,7 @@ class Parser:
             self.syntax_errors += (f"#{lineno} : syntax error, illegal {lexeme} \n")
             self.lookahead = self.scanner.get_next_token()
         tree = "\n".join(self.print_tree(self.parse_tree()['Program']))
-        raise SyntaxError((self.syntax_errors, tree))
+        raise SyntaxError((self.syntax_errors, f"Program\n{tree}"))
 
     def match(self, expected_type, expected_lexeme=None):
         token = self.lookahead
