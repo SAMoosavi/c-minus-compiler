@@ -33,5 +33,7 @@ Thumbs.db
 # 🚀 Misc
 antlr-*.jar
 
-ANTLR_p1.txt
+antlr*.txt
 CMinus.py
+CMinusParser.py
+CMinusParserListener.py
