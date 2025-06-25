@@ -27,6 +27,9 @@ class Parser:
                 
                 if content not in node:
                     node[content] = {}
+                else:
+                    content += "|"+"".join(node.keys())
+                    node[content] = {}
 
                 stack.append(content)
                 
@@ -36,6 +39,9 @@ class Parser:
                     node = node[k]
                 
                 if content not in node:
+                    node[content] = {}
+                else:
+                    content += "|"+"".join(node.keys())
                     node[content] = {}
 
                 stack.append(content)
@@ -50,6 +56,9 @@ class Parser:
                 
                 if content not in node:
                     node[content] = {}
+                else:
+                    content += "|"+"".join(node.keys())
+                    node[content] = {}
 
                 stack.append(content)
 
@@ -63,7 +72,7 @@ class Parser:
             is_last_key = i == len(keys) - 1
             branch = "└── " if is_last_key else "├── "
             connector = "    " if is_last_key else "│   "
-            out.append(f"{prefix}{branch}{key}")
+            out.append(f"{prefix}{branch}{key.split('|')[0]}")
             if not is_terminal:
                 out.extend(self.print_tree(d[key], prefix + connector))
         return out
@@ -109,7 +118,6 @@ class Parser:
         tree = "\n".join(self.print_tree(self.parse_tree()['Program']))
         return f"Program\n{tree}", self.syntax_errors
 
-    # Grammar Rule: Program → Declaration-list
     def Program(self):
         self.indent("Declaration-list")
         self.Declaration_list()
@@ -142,25 +150,31 @@ class Parser:
         self.match("ID")
 
     def Declaration_prime(self):
-        if self.lookahead[1][1] == '(':  # Fun-declaration-prime
+        if self.lookahead[1][1] == '(':
             self.indent("Fun-declaration-prime")
-            self.match("SYMBOL", "(")
-            self.indent("Params")
-            self.Params()
+            self.Fun_declaration_prime()
             self.dedent()
-            self.match("SYMBOL", ")")
-            self.indent("Compound-stmt")
-            self.Compound_stmt()
-            self.dedent()
-            self.dedent()
-        else:  # Var-declaration-prime
+        else:
             self.indent("Var-declaration-prime")
-            if self.lookahead[1][1] == '[':
-                self.match("SYMBOL", "[")
-                self.match("NUM")
-                self.match("SYMBOL", "]")
-            self.match("SYMBOL", ";")
+            self.Var_declaration_prime()
             self.dedent()
+
+    def Var_declaration_prime(self):
+        if self.lookahead[1][1] == '[':
+            self.match("SYMBOL", "[")
+            self.match("NUM")
+            self.match("SYMBOL", "]")
+        self.match("SYMBOL", ";")
+
+    def Fun_declaration_prime(self):
+        self.match("SYMBOL", "(")
+        self.indent("Params")
+        self.Params()
+        self.dedent()
+        self.match("SYMBOL", ")")
+        self.indent("Compound-stmt")
+        self.Compound_stmt()
+        self.dedent()
 
     def Type_specifier(self):
         if self.lookahead[1][1] in ("int", "void"):
@@ -179,14 +193,6 @@ class Parser:
             self.dedent()
             self.indent("Param-list")
             self.Param_list()
-            self.dedent()
-
-    def Param_prime(self):
-        if self.lookahead[1][1] == '[':
-            self.match("SYMBOL", "[")
-            self.match("SYMBOL", "]")
-        else:
-            self.indent("epsilon")
             self.dedent()
 
     def Param_list(self):
@@ -209,6 +215,14 @@ class Parser:
         self.indent("Param-prime")
         self.Param_prime()
         self.dedent()
+
+    def Param_prime(self):
+        if self.lookahead[1][1] == '[':
+            self.match("SYMBOL", "[")
+            self.match("SYMBOL", "]")
+        else:
+            self.indent("epsilon")
+            self.dedent()
 
     def Compound_stmt(self):
         self.match("SYMBOL", "{")
@@ -235,39 +249,15 @@ class Parser:
     def Statement(self):
         if self.lookahead[1][1] == 'if':
             self.indent("Selection-stmt")
-            self.match("KEYWORD", "if")
-            self.match("SYMBOL", "(")
-            self.indent("Expression")
-            self.Expression()
-            self.dedent()
-            self.match("SYMBOL", ")")
-            self.indent("Statement")
-            self.Statement()
-            self.dedent()
-            self.match("KEYWORD", "else")
-            self.indent("Statement")
-            self.Statement()
-            self.dedent()
+            self.Selection_stmt()
             self.dedent()
         elif self.lookahead[1][1] == 'repeat':
             self.indent("Iteration-stmt")
-            self.match("KEYWORD", "repeat")
-            self.indent("Statement")
-            self.Statement()
-            self.dedent()
-            self.match("KEYWORD", "until")
-            self.match("SYMBOL", "(")
-            self.indent("Expression")
-            self.Expression()
-            self.dedent()
-            self.match("SYMBOL", ")")
+            self.Iteration_stmt()
             self.dedent()
         elif self.lookahead[1][1] == 'return':
             self.indent("Return-stmt")
-            self.match("KEYWORD", "return")
-            self.indent("Return-stmt-prime")
-            self.Return_stmt_prime()
-            self.dedent()
+            self.Return_stmt()
             self.dedent()
         elif self.lookahead[1][1] == '{':
             self.indent("Compound-stmt")
@@ -277,14 +267,6 @@ class Parser:
             self.indent("Expression-stmt")
             self.Expression_stmt()
             self.dedent()
-    
-    def Return_stmt_prime(self):
-        if self.lookahead[1][1] != ';':
-            self.indent("Expression")
-            self.Expression()
-            self.dedent()
-        else:
-            self.match("SYMBOL", ";")
 
     def Expression_stmt(self):
         if self.lookahead[1][1] == 'break':
@@ -298,12 +280,54 @@ class Parser:
             self.dedent()
             self.match("SYMBOL", ";")
 
+    def Selection_stmt(self):
+        self.match("KEYWORD", "if")
+        self.match("SYMBOL", "(")
+        self.indent("Expression")
+        self.Expression()
+        self.dedent()
+        self.match("SYMBOL", ")")
+        self.indent("Statement")
+        self.Statement()
+        self.dedent()
+        self.match("KEYWORD", "else")
+        self.indent("Statement")
+        self.Statement()
+        self.dedent()
+
+    def Iteration_stmt(self):
+        self.match("KEYWORD", "repeat")
+        self.indent("Statement")
+        self.Statement()
+        self.dedent()
+        self.match("KEYWORD", "until")
+        self.match("SYMBOL", "(")
+        self.indent("Expression")
+        self.Expression()
+        self.dedent()
+        self.match("SYMBOL", ")")
+
+    def Return_stmt(self):
+        self.match("KEYWORD", "return")
+        self.indent("Return-stmt-prime")
+        self.Return_stmt_prime()
+        self.dedent()
+
+    def Return_stmt_prime(self):
+        if self.lookahead[1][1] != ';':
+            self.indent("Expression")
+            self.Expression()
+            self.dedent()
+            self.match("SYMBOL", ";")
+        else:
+            self.match("SYMBOL", ";")
+
     def Expression(self):
         if self.lookahead[1][0] == "NUM" or self.lookahead[1][1] == "(":
             self.indent("Simple-expression-zegond")
             self.Simple_expression_zegond()
             self.dedent()
-        elif self.lookahead[1][0] == "ID":
+        else:
             self.match("ID")
             self.indent("B")
             self.B()
@@ -346,20 +370,20 @@ class Parser:
             self.C()
             self.dedent()
 
+    def Simple_expression_zegond(self):
+        self.indent("Additive-expression-zegond")
+        self.Additive_expression_zegond()
+        self.dedent()
+        self.indent("C")
+        self.C()
+        self.dedent()
+
     def Simple_expression_prime(self):
         self.indent("Additive-expression-prime")
         self.Additive_expression_prime()
         self.dedent()
         self.indent("C")
         self.C()
-        self.dedent()
-
-    def Additive_expression_prime(self):
-        self.indent("Term-prime")
-        self.Term_prime()
-        self.dedent()
-        self.indent("D")
-        self.D()
         self.dedent()
 
     def C(self):
@@ -385,6 +409,22 @@ class Parser:
     def Additive_expression(self):
         self.indent("Term")
         self.Term()
+        self.dedent()
+        self.indent("D")
+        self.D()
+        self.dedent()
+
+    def Additive_expression_prime(self):
+        self.indent("Term-prime")
+        self.Term_prime()
+        self.dedent()
+        self.indent("D")
+        self.D()
+        self.dedent()
+
+    def Additive_expression_zegond(self):
+        self.indent("Term-zegond")
+        self.Term_zegond()
         self.dedent()
         self.indent("D")
         self.D()
@@ -429,6 +469,14 @@ class Parser:
         self.G()
         self.dedent()
 
+    def Term_zegond(self):
+        self.indent("Factor-zegond")
+        self.Factor_zegond()
+        self.dedent()
+        self.indent("G")
+        self.G()
+        self.dedent()
+
     def G(self):
         if self.lookahead[1][1] == '*':
             self.match("SYMBOL", "*")
@@ -459,17 +507,6 @@ class Parser:
         else:
             self.syntax_error("Invalid factor")
 
-    def Factor_prime(self):
-        if self.lookahead[1][1] == '(':
-            self.match("SYMBOL", "(")
-            self.indent("Args")
-            self.Args()
-            self.dedent()
-            self.match("SYMBOL", ")")
-        else:
-            self.indent("epsilon")
-            self.dedent()
-
     def Var_call_prime(self):
         if self.lookahead[1][1] == '(':
             self.match("SYMBOL", "(")
@@ -481,7 +518,6 @@ class Parser:
             self.indent("Var-prime")
             self.Var_prime()
             self.dedent()
-            
 
     def Var_prime(self):
         if self.lookahead[1][1] == '[':
@@ -493,6 +529,29 @@ class Parser:
         else:
             self.indent("epsilon")
             self.dedent()
+
+    def Factor_prime(self):
+        if self.lookahead[1][1] == '(':
+            self.match("SYMBOL", "(")
+            self.indent("Args")
+            self.Args()
+            self.dedent()
+            self.match("SYMBOL", ")")
+        else:
+            self.indent("epsilon")
+            self.dedent()
+
+    def Factor_zegond(self):
+        if self.lookahead[1][1] == '(':
+            self.match("SYMBOL", "(")
+            self.indent("Expression")
+            self.Expression()
+            self.dedent()
+            self.match("SYMBOL", ")")
+        elif self.lookahead[1][0] == "NUM":
+            self.match("NUM")
+        else:
+            self.syntax_error("Expected '(' or NUM in Factor-zegond")
 
     def Args(self):
         if self.lookahead[1][1] != ')':
@@ -523,39 +582,3 @@ class Parser:
         else:
             self.indent("epsilon")
             self.dedent()
-
-    def Simple_expression_zegond(self):
-        self.indent("Additive-expression-zegond")
-        self.Additive_expression_zegond()
-        self.dedent()
-        self.indent("C")
-        self.C()
-        self.dedent()
-
-    def Additive_expression_zegond(self):
-        self.indent("Term-zegond")
-        self.Term_zegond()
-        self.dedent()
-        self.indent("D")
-        self.D()
-        self.dedent()
-
-    def Term_zegond(self):
-        self.indent("Factor-zegond")
-        self.Factor_zegond()
-        self.dedent()
-        self.indent("G")
-        self.G()
-        self.dedent()
-
-    def Factor_zegond(self):
-        if self.lookahead[1][1] == '(':
-            self.match("SYMBOL", "(")
-            self.indent("Expression")
-            self.Expression()
-            self.dedent()
-            self.match("SYMBOL", ")")
-        elif self.lookahead[1][0] == "NUM":
-            self.match("NUM")
-        else:
-            self.syntax_error("Expected '(' or NUM in Factor-zegond")
