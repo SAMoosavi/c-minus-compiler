@@ -1,3 +1,5 @@
+from code_generator import CodeGenerator
+
 class Parser:
     def __init__(self, scanner):
         self.scanner = scanner
@@ -5,6 +7,7 @@ class Parser:
         self.output = []
         self.indent_level = 0
         self.syntax_errors = ""
+        self.code_gen = CodeGenerator()
 
     def parse_tree(self):
         lines = self.output
@@ -147,6 +150,9 @@ class Parser:
         self.indent("Type-specifier")
         self.Type_specifier()
         self.dedent()
+
+        if self.lookahead[1][0] == "ID":
+            self.var_name = self.lookahead[1][1]  # ⬅️ ذخیره اسم متغیر برای مراحل بعد
         self.match("ID")
 
     def Declaration_prime(self):
@@ -162,9 +168,22 @@ class Parser:
     def Var_declaration_prime(self):
         if self.lookahead[1][1] == '[':
             self.match("SYMBOL", "[")
+            if self.lookahead[1][0] == "NUM":
+                size = int(self.lookahead[1][1])
+            else:
+                size = 1  # fallback
             self.match("NUM")
             self.match("SYMBOL", "]")
-        self.match("SYMBOL", ";")
+            self.match("SYMBOL", ";")
+            # ⬅️ Action Symbol برای آرایه
+            for i in range(size):
+                name = f"{self.var_name}[{i}]"
+                self.code_gen.get_var_address(name)
+        else:
+            self.match("SYMBOL", ";")
+
+            # ⬅️ Action Symbol برای متغیر معمولی
+            self.code_gen.get_var_address(self.var_name)
 
     def Fun_declaration_prime(self):
         self.match("SYMBOL", "(")

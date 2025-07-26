@@ -11,6 +11,7 @@ def main():
 
     scanner = Scanner(lines)
     parser = Parser(scanner)
+    parser.code_gen.write_output("output.txt")
 
     try:
         parse_tree_lines, syntax_errors = parser.parse()
