@@ -11,10 +11,10 @@ def main():
 
     scanner = Scanner(lines)
     parser = Parser(scanner)
-    parser.code_gen.write_output("output.txt")
 
     try:
         parse_tree_lines, syntax_errors = parser.parse()
+        parser.code_gen.write_output("output.txt")
     except SyntaxError as e:
         syntax_error_msg, parse_tree_str = e.args[0]
         write_to_file("syntax_errors.txt", syntax_error_msg)

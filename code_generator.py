@@ -37,3 +37,6 @@ class CodeGenerator:
         else:
             with open(filename, "w") as f:
                 f.write("\n".join(self.output))
+        print("\nSymbol Table:")
+        for name, addr in self.symbol_table.items():
+            print(f"{name}: {addr}")
