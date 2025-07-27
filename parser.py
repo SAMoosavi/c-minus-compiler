@@ -1,5 +1,6 @@
 from code_generator import CodeGenerator
 
+
 class Parser:
     def __init__(self, scanner):
         self.scanner = scanner
@@ -15,52 +16,52 @@ class Parser:
         ans = {}
 
         def get_indent_level(line):
-            return len(line) - len(line.lstrip('\t'))
+            return len(line) - len(line.lstrip("\t"))
 
-        stack.append('ROOT')
+        stack.append("ROOT")
 
         for line in lines:
             level = get_indent_level(line)
-            content:str = line.strip()
-            if level+1 == len(stack):
+            content: str = line.strip()
+            if level + 1 == len(stack):
                 stack.pop()
                 node = ans
                 for k in stack:
                     node = node[k]
-                
+
                 if content not in node:
                     node[content] = {}
                 else:
-                    content += "|"+"".join(node.keys())
+                    content += "|" + "".join(node.keys())
                     node[content] = {}
 
                 stack.append(content)
-                
-            elif level+1 >= len(stack):
+
+            elif level + 1 >= len(stack):
                 node = ans
                 for k in stack:
                     node = node[k]
-                
+
                 if content not in node:
                     node[content] = {}
                 else:
-                    content += "|"+"".join(node.keys())
+                    content += "|" + "".join(node.keys())
                     node[content] = {}
 
                 stack.append(content)
             else:
-                while level+1 != len(stack):
+                while level + 1 != len(stack):
                     stack.pop()
-                
+
                 stack.pop()
                 node = ans
                 for k in stack:
                     node = node[k]
-                
+
                 if content not in node:
                     node[content] = {}
                 else:
-                    content += "|"+"".join(node.keys())
+                    content += "|" + "".join(node.keys())
                     node[content] = {}
 
                 stack.append(content)
@@ -79,28 +80,32 @@ class Parser:
             if not is_terminal:
                 out.extend(self.print_tree(d[key], prefix + connector))
         return out
-    
+
     def syntax_error(self, error):
         self.syntax_errors += error + "\n"
-        while(self.lookahead != '$'):
+        while self.lookahead != "$":
             lineno, (tok_type, lexeme) = self.lookahead
-            self.syntax_errors += (f"#{lineno} : syntax error, illegal {lexeme} \n")
+            self.syntax_errors += f"#{lineno} : syntax error, illegal {lexeme} \n"
             self.lookahead = self.scanner.get_next_token()
-        tree = "\n".join(self.print_tree(self.parse_tree()['Program']))
+        tree = "\n".join(self.print_tree(self.parse_tree()["Program"]))
         raise SyntaxError((self.syntax_errors, f"Program\n{tree}"))
 
     def match(self, expected_type, expected_lexeme=None):
         token = self.lookahead
-        if token == '$':
+        if token == "$":
             self.syntax_error("Unexpected EOF")
             return
 
         lineno, (tok_type, lexeme) = token
-        if tok_type == expected_type and (expected_lexeme is None or lexeme == expected_lexeme):
+        if tok_type == expected_type and (
+            expected_lexeme is None or lexeme == expected_lexeme
+        ):
             self.output.append(self.format_token(tok_type, lexeme))
             self.lookahead = self.scanner.get_next_token()
         else:
-            self.syntax_error(f"Expected {expected_type}('{expected_lexeme}') but got {tok_type}('{lexeme}')")
+            self.syntax_error(
+                f"Expected {expected_type}('{expected_lexeme}') but got {tok_type}('{lexeme}')"
+            )
 
     def indent(self, label):
         self.output.append("\t" * self.indent_level + label)
@@ -118,7 +123,7 @@ class Parser:
         self.indent("$")
         self.dedent()
         self.dedent()
-        tree = "\n".join(self.print_tree(self.parse_tree()['Program']))
+        tree = "\n".join(self.print_tree(self.parse_tree()["Program"]))
         return f"Program\n{tree}", self.syntax_errors
 
     def Program(self):
@@ -127,7 +132,7 @@ class Parser:
         self.dedent()
 
     def Declaration_list(self):
-        if self.lookahead == '$' or self.lookahead[1][1] not in ("int", "void"):
+        if self.lookahead == "$" or self.lookahead[1][1] not in ("int", "void"):
             self.indent("epsilon")
             self.dedent()
             return
@@ -156,7 +161,7 @@ class Parser:
         self.match("ID")
 
     def Declaration_prime(self):
-        if self.lookahead[1][1] == '(':
+        if self.lookahead[1][1] == "(":
             self.indent("Fun-declaration-prime")
             self.Fun_declaration_prime()
             self.dedent()
@@ -166,7 +171,7 @@ class Parser:
             self.dedent()
 
     def Var_declaration_prime(self):
-        if self.lookahead[1][1] == '[':
+        if self.lookahead[1][1] == "[":
             self.match("SYMBOL", "[")
             if self.lookahead[1][0] == "NUM":
                 size = int(self.lookahead[1][1])
@@ -215,7 +220,7 @@ class Parser:
             self.dedent()
 
     def Param_list(self):
-        if self.lookahead[1][1] == ',':
+        if self.lookahead[1][1] == ",":
             self.match("SYMBOL", ",")
             self.indent("Param")
             self.Param()
@@ -236,7 +241,7 @@ class Parser:
         self.dedent()
 
     def Param_prime(self):
-        if self.lookahead[1][1] == '[':
+        if self.lookahead[1][1] == "[":
             self.match("SYMBOL", "[")
             self.match("SYMBOL", "]")
         else:
@@ -254,7 +259,13 @@ class Parser:
         self.match("SYMBOL", "}")
 
     def Statement_list(self):
-        if self.lookahead[1][1] in ('if', 'repeat', 'return', 'break', '{') or self.lookahead[1][0] in ('ID', 'NUM', '('):
+        if self.lookahead[1][1] in (
+            "if",
+            "repeat",
+            "return",
+            "break",
+            "{",
+        ) or self.lookahead[1][0] in ("ID", "NUM", "("):
             self.indent("Statement")
             self.Statement()
             self.dedent()
@@ -266,19 +277,19 @@ class Parser:
             self.dedent()
 
     def Statement(self):
-        if self.lookahead[1][1] == 'if':
+        if self.lookahead[1][1] == "if":
             self.indent("Selection-stmt")
             self.Selection_stmt()
             self.dedent()
-        elif self.lookahead[1][1] == 'repeat':
+        elif self.lookahead[1][1] == "repeat":
             self.indent("Iteration-stmt")
             self.Iteration_stmt()
             self.dedent()
-        elif self.lookahead[1][1] == 'return':
+        elif self.lookahead[1][1] == "return":
             self.indent("Return-stmt")
             self.Return_stmt()
             self.dedent()
-        elif self.lookahead[1][1] == '{':
+        elif self.lookahead[1][1] == "{":
             self.indent("Compound-stmt")
             self.Compound_stmt()
             self.dedent()
@@ -288,10 +299,10 @@ class Parser:
             self.dedent()
 
     def Expression_stmt(self):
-        if self.lookahead[1][1] == 'break':
+        if self.lookahead[1][1] == "break":
             self.match("KEYWORD", "break")
             self.match("SYMBOL", ";")
-        elif self.lookahead[1][1] == ';':
+        elif self.lookahead[1][1] == ";":
             self.match("SYMBOL", ";")
         else:
             self.indent("Expression")
@@ -333,7 +344,7 @@ class Parser:
         self.dedent()
 
     def Return_stmt_prime(self):
-        if self.lookahead[1][1] != ';':
+        if self.lookahead[1][1] != ";":
             self.indent("Expression")
             self.Expression()
             self.dedent()
@@ -344,21 +355,26 @@ class Parser:
     def Expression(self):
         if self.lookahead[1][0] == "NUM" or self.lookahead[1][1] == "(":
             self.indent("Simple-expression-zegond")
-            self.Simple_expression_zegond()
+            result = self.Simple_expression_zegond()
             self.dedent()
+            return result
         else:
+            var_name = self.lookahead[1][1]  # ذخیره ID برای رجوع بعدی
             self.match("ID")
             self.indent("B")
-            self.B()
+            result = self.B(var_name)  # تابع جدید
             self.dedent()
+            return result
 
-    def B(self):
-        if self.lookahead[1][1] == '=':
+    def B(self, var_name: str):
+        if self.lookahead[1][1] == "=":
             self.match("SYMBOL", "=")
             self.indent("Expression")
-            self.Expression()
+            rhs_addr = self.Expression()
             self.dedent()
-        elif self.lookahead[1][1] == '[':
+            self.code_gen.add_code(f"{var_name} := {rhs_addr}")
+            return var_name
+        elif self.lookahead[1][1] == "[": #TODO: complete it
             self.match("SYMBOL", "[")
             self.indent("Expression")
             self.Expression()
@@ -373,7 +389,7 @@ class Parser:
             self.dedent()
 
     def H(self):
-        if self.lookahead[1][1] == '=':
+        if self.lookahead[1][1] == "=":
             self.match("SYMBOL", "=")
             self.indent("Expression")
             self.Expression()
@@ -391,11 +407,12 @@ class Parser:
 
     def Simple_expression_zegond(self):
         self.indent("Additive-expression-zegond")
-        self.Additive_expression_zegond()
+        result = self.Additive_expression_zegond()
         self.dedent()
         self.indent("C")
         self.C()
         self.dedent()
+        return result
 
     def Simple_expression_prime(self):
         self.indent("Additive-expression-prime")
@@ -406,7 +423,7 @@ class Parser:
         self.dedent()
 
     def C(self):
-        if self.lookahead[1][1] in ('<', '=='):
+        if self.lookahead[1][1] in ("<", "=="):
             self.indent("Relop")
             self.Relop()
             self.dedent()
@@ -418,9 +435,9 @@ class Parser:
             self.dedent()
 
     def Relop(self):
-        if self.lookahead[1][1] == '<':
+        if self.lookahead[1][1] == "<":
             self.match("SYMBOL", "<")
-        elif self.lookahead[1][1] == '==':
+        elif self.lookahead[1][1] == "==":
             self.match("SYMBOL", "==")
         else:
             self.syntax_error("Expected relational operator")
@@ -443,42 +460,56 @@ class Parser:
 
     def Additive_expression_zegond(self):
         self.indent("Term-zegond")
-        self.Term_zegond()
+        left = self.Term_zegond()  # مقدار سمت چپ (مثلاً a)
         self.dedent()
         self.indent("D")
-        self.D()
+        result = self.D(left)  # ادامهٔ جمع/تفریق رو انجام بده
         self.dedent()
+        return result
 
-    def D(self):
-        if self.lookahead[1][1] in ('+', '-'):
+    def D(self, inherited=None):
+        if self.lookahead[1][1] in ("+", "-"):
             self.indent("Addop")
+            op = self.lookahead[1][1]
             self.Addop()
             self.dedent()
+
             self.indent("Term")
-            self.Term()
+            right = self.Term()  # باید مقدار رو از Term بگیریم
             self.dedent()
+
+            # تولید کد ۳آدرسی
+            result = self.code_gen.new_temp()
+            tac_op = "ADD" if op == "+" else "SUB"
+            self.code_gen.emit(tac_op, inherited, right, result)
+
             self.indent("D")
-            self.D()
+            result = self.D(result)  # بازگشت با نتیجه جدید
             self.dedent()
+            return result
         else:
             self.indent("epsilon")
             self.dedent()
+            return inherited
 
     def Addop(self):
-        if self.lookahead[1][1] == '+':
+        if self.lookahead[1][1] == "+":
             self.match("SYMBOL", "+")
-        elif self.lookahead[1][1] == '-':
+        elif self.lookahead[1][1] == "-":
             self.match("SYMBOL", "-")
         else:
             self.syntax_error("Expected additive operator")
 
     def Term(self):
         self.indent("Factor")
-        self.Factor()
+        left = self.Factor()
         self.dedent()
+
         self.indent("G")
-        self.G()
+        result = self.G(left)
         self.dedent()
+
+        return result
 
     def Term_prime(self):
         self.indent("Factor-prime")
@@ -490,56 +521,75 @@ class Parser:
 
     def Term_zegond(self):
         self.indent("Factor-zegond")
-        self.Factor_zegond()
+        num = self.Factor_zegond()
         self.dedent()
         self.indent("G")
         self.G()
         self.dedent()
+        return num
 
-    def G(self):
-        if self.lookahead[1][1] == '*':
+    def G(self, inherited=""):
+        if self.lookahead[1][1] == "*":
             self.match("SYMBOL", "*")
             self.indent("Factor")
-            self.Factor()
+            right = self.Factor()
             self.dedent()
+            result = self.code_gen.new_temp()
+            self.code_gen.emit("MULT", inherited, right, result)
             self.indent("G")
-            self.G()
+            result = self.G(result)
             self.dedent()
+            return result
         else:
             self.indent("epsilon")
             self.dedent()
+            return inherited
 
     def Factor(self):
-        if self.lookahead[1][1] == '(':
+        if self.lookahead[1][1] == "(":
             self.match("SYMBOL", "(")
             self.indent("Expression")
-            self.Expression()
+            result = self.Expression()
             self.dedent()
             self.match("SYMBOL", ")")
+            return result
         elif self.lookahead[1][0] == "ID":
+            name = self.lookahead[1][1]
             self.match("ID")
             self.indent("Var-call-prime")
-            self.Var_call_prime()
+            result = self.Var_call_prime(name)  # اسم متغیر رو پاس می‌دیم
             self.dedent()
+            return result
         elif self.lookahead[1][0] == "NUM":
+            value = self.lookahead[1][1]
             self.match("NUM")
+            return f"#{value}"  # عدد فوری
         else:
             self.syntax_error("Invalid factor")
+            return None
 
-    def Var_call_prime(self):
-        if self.lookahead[1][1] == '(':
+    def Var_call_prime(self, name):
+        if self.lookahead[1][1] == "(":
+            # برای توابع — فعلاً نیاز نداریم
             self.match("SYMBOL", "(")
             self.indent("Args")
             self.Args()
             self.dedent()
             self.match("SYMBOL", ")")
+            temp = self.code_gen.new_temp()
+            self.code_gen.emit("CALL", name, "", temp)
+            return temp
         else:
             self.indent("Var-prime")
             self.Var_prime()
             self.dedent()
+            addr = self.code_gen.get_var_address(name)
+            temp = self.code_gen.new_temp()
+            self.code_gen.emit("ASSIGN", addr, "", temp)
+            return temp
 
     def Var_prime(self):
-        if self.lookahead[1][1] == '[':
+        if self.lookahead[1][1] == "[":
             self.match("SYMBOL", "[")
             self.indent("Expression")
             self.Expression()
@@ -550,7 +600,7 @@ class Parser:
             self.dedent()
 
     def Factor_prime(self):
-        if self.lookahead[1][1] == '(':
+        if self.lookahead[1][1] == "(":
             self.match("SYMBOL", "(")
             self.indent("Args")
             self.Args()
@@ -560,20 +610,22 @@ class Parser:
             self.indent("epsilon")
             self.dedent()
 
-    def Factor_zegond(self):
-        if self.lookahead[1][1] == '(':
+    def Factor_zegond(self):#TODO: complete it
+        if self.lookahead[1][1] == "(":
             self.match("SYMBOL", "(")
             self.indent("Expression")
             self.Expression()
             self.dedent()
             self.match("SYMBOL", ")")
         elif self.lookahead[1][0] == "NUM":
+            value = self.lookahead[1][1]
             self.match("NUM")
+            return f"#{value}"  # عدد فوری
         else:
             self.syntax_error("Expected '(' or NUM in Factor-zegond")
 
     def Args(self):
-        if self.lookahead[1][1] != ')':
+        if self.lookahead[1][1] != ")":
             self.indent("Arg-list")
             self.Arg_list()
             self.dedent()
@@ -590,7 +642,7 @@ class Parser:
         self.dedent()
 
     def Arg_list_prime(self):
-        if self.lookahead[1][1] == ',':
+        if self.lookahead[1][1] == ",":
             self.match("SYMBOL", ",")
             self.indent("Expression")
             self.Expression()

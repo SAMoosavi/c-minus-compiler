@@ -5,6 +5,7 @@ class CodeGenerator:
         self.line_no = 0
         self.symbol_table = {}  # نگهداری آدرس متغیرها
         self.jump_stack = []  # برای کنترل پرش‌ها (مثل repeat)
+        self.program_block = []
 
     def new_temp(self):
         temp = self.temp_count
@@ -15,6 +16,9 @@ class CodeGenerator:
         if name not in self.symbol_table:
             self.symbol_table[name] = len(self.symbol_table) * 4 + 100
         return self.symbol_table[name]
+
+    def add_code(self, code):
+        self.program_block.append(code)
 
     def emit(self, op, arg1="", arg2="", result=""):
         line = f"{self.line_no}\t({op}, {arg1}, {arg2}, {result})"
@@ -33,7 +37,8 @@ class CodeGenerator:
     def write_output(self, filename="output.txt"):
         if not self.output:
             with open(filename, "w") as f:
-                f.write("The output code has not been generated\n")
+                for i, line in enumerate(self.program_block):
+                    f.write(f"{i}\t{line}\n")
         else:
             with open(filename, "w") as f:
                 f.write("\n".join(self.output))
