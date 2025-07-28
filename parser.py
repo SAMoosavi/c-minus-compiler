@@ -305,9 +305,7 @@ class Parser:
         elif self.lookahead[1][1] == ";":
             self.match("SYMBOL", ";")
         else:
-            self.indent("Expression")
-            self.Expression()
-            self.dedent()
+            result = self.Expression()  # ← مقدار رو بگیر ولی نیاز نیست استفاده شه
             self.match("SYMBOL", ";")
 
     def Selection_stmt(self):
@@ -372,7 +370,7 @@ class Parser:
             self.indent("Expression")
             rhs_addr = self.Expression()
             self.dedent()
-            self.code_gen.add_code(f"{var_name} := {rhs_addr}")
+            self.code_gen.emit("ASSIGN", rhs_addr, "", var_name)  # ✅ اصلاح شده
             return var_name
         elif self.lookahead[1][1] == "[":
             self.match("SYMBOL", "[")
@@ -384,17 +382,16 @@ class Parser:
             offset = self.code_gen.new_temp()
             self.code_gen.emit("MULT", index, "#4", offset)
             base_addr = self.code_gen.get_var_address(f"{var_name}[0]")
-            # addr = base + offset
             addr = self.code_gen.new_temp()
             self.code_gen.emit("ADD", f"#{base_addr}", offset, addr)
             self.indent("H")
-            result = self.H(addr)  # ← حالا H تصمیم می‌گیره بخونه یا بنویسه
+            result = self.H(addr)
             self.dedent()
-            return result  # در حالت استفاده (مثل x = a[i] + 1)، H مقدار برمی‌گردونه
-        else:  # TODO:complete it
-            self.indent("Simple-expression-prime")
-            self.Simple_expression_prime()
-            self.dedent()
+            return result
+        else:
+            result = self.Simple_expression_prime()
+            return result
+
 
     def H(self, addr):  # ← آدرس محاسبه‌شده a[i] از B
         if self.lookahead[1][1] == "=":
