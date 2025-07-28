@@ -244,9 +244,13 @@ class Parser:
         if self.lookahead[1][1] == "[":
             self.match("SYMBOL", "[")
             self.match("SYMBOL", "]")
+            # ثبت به عنوان آرایه (به عنوان اشاره‌گر)
+            self.code_gen.get_var_address(self.var_name + "[]")
         else:
             self.indent("epsilon")
             self.dedent()
+            # ثبت پارامتر معمولی
+            self.code_gen.get_var_address(self.var_name)
 
     def Compound_stmt(self):
         self.match("SYMBOL", "{")
@@ -314,16 +318,24 @@ class Parser:
         self.match("KEYWORD", "if")
         self.match("SYMBOL", "(")
         self.indent("Expression")
-        self.Expression()
+        cond = self.Expression()  # ← شرط را ارزیابی کن و مقدار برگشتی بگیر (temp)
         self.dedent()
         self.match("SYMBOL", ")")
+        else_label = self.code_gen.new_label()
+        end_label = self.code_gen.new_label()
+        self.code_gen.emit("JPF", cond, else_label, "")  # ← اگر شرط برقرار نبود برو else
         self.indent("Statement")
-        self.Statement()
+        self.Statement()  # ← then
         self.dedent()
+        self.code_gen.emit("JP", end_label, "", "")  # ← بعد از then برو انتهای if
+        self.code_gen.emit("LABEL", else_label, "", "")
         self.match("KEYWORD", "else")
         self.indent("Statement")
-        self.Statement()
+        self.Statement()  # ← else
         self.dedent()
+
+        self.code_gen.emit("LABEL", end_label, "", "")
+
 
     def Iteration_stmt(self):
         loop_start = self.code_gen.new_label()
@@ -397,7 +409,7 @@ class Parser:
             return result
         else:
             self.indent("Simple-expression-prime")
-            result = self.Simple_expression_prime()
+            result = self.Simple_expression_prime(var_name)
             return result
 
     def H(self, addr):  # ← آدرس محاسبه‌شده a[i] از B
@@ -429,9 +441,9 @@ class Parser:
         self.dedent()
         return result
 
-    def Simple_expression_prime(self):
+    def Simple_expression_prime(self, name):
         self.indent("Additive-expression-prime")
-        left = self.Additive_expression_prime()
+        left = self.Additive_expression_prime(name)
         self.dedent()
 
         self.indent("C")
@@ -477,9 +489,9 @@ class Parser:
 
         return result
 
-    def Additive_expression_prime(self):
+    def Additive_expression_prime(self,name):
         self.indent("Term-prime")
-        left = self.Term_prime()
+        left = self.Term_prime(name)
         self.dedent()
 
         self.indent("D")
@@ -541,9 +553,9 @@ class Parser:
 
         return result
 
-    def Term_prime(self):
+    def Term_prime(self, name):
         self.indent("Factor-prime")
-        left = self.Factor_prime()
+        left = self.Factor_prime(name)
         self.dedent()
 
         self.indent("G")
@@ -632,7 +644,6 @@ class Parser:
             self.dedent()
             self.match("SYMBOL", "]")
 
-            # offset = index * 4
             offset = self.code_gen.new_temp()
             self.code_gen.emit("MULT", index, "#4", offset)
 
@@ -641,15 +652,18 @@ class Parser:
             effective_addr = self.code_gen.new_temp()
             self.code_gen.emit("ADD", f"#{base_addr}", offset, effective_addr)
 
-            result = self.code_gen.new_temp()
-            self.code_gen.emit("ASSIGN", effective_addr, "", result)
-            return result
+            # مقدار در addr را بخوان
+            temp = self.code_gen.new_temp()
+            self.code_gen.emit("ASSIGN", f"@{effective_addr}", "", temp)
+            return temp
         else:
             self.indent("epsilon")
             self.dedent()
+
+            # مقدار متغیر ساده را بخوان
             addr = self.code_gen.get_var_address(name)
             temp = self.code_gen.new_temp()
-            self.code_gen.emit("ASSIGN", f"#{addr}", "", temp)
+            self.code_gen.emit("ASSIGN", f"@{addr}", "", temp)
             return temp
 
     def Factor_prime(self, name=""):
