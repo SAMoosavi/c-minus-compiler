@@ -374,65 +374,85 @@ class Parser:
             self.dedent()
             self.code_gen.add_code(f"{var_name} := {rhs_addr}")
             return var_name
-        elif self.lookahead[1][1] == "[": #TODO: complete it
+        elif self.lookahead[1][1] == "[":
             self.match("SYMBOL", "[")
             self.indent("Expression")
-            self.Expression()
+            index = self.Expression()  # i
             self.dedent()
             self.match("SYMBOL", "]")
+            # offset = index * 4
+            offset = self.code_gen.new_temp()
+            self.code_gen.emit("MULT", index, "#4", offset)
+            base_addr = self.code_gen.get_var_address(f"{var_name}[0]")
+            # addr = base + offset
+            addr = self.code_gen.new_temp()
+            self.code_gen.emit("ADD", f"#{base_addr}", offset, addr)
             self.indent("H")
-            self.H()
+            result = self.H(addr)  # ← حالا H تصمیم می‌گیره بخونه یا بنویسه
             self.dedent()
-        else:
+            return result  # در حالت استفاده (مثل x = a[i] + 1)، H مقدار برمی‌گردونه
+        else:  # TODO:complete it
             self.indent("Simple-expression-prime")
             self.Simple_expression_prime()
             self.dedent()
 
-    def H(self):
+    def H(self, addr):  # ← آدرس محاسبه‌شده a[i] از B
         if self.lookahead[1][1] == "=":
             self.match("SYMBOL", "=")
             self.indent("Expression")
-            self.Expression()
+            value = self.Expression()  # مقدار سمت راست
             self.dedent()
+            self.code_gen.emit("ASSIGN", value, f"@{addr}", "")
+            return None
         else:
             self.indent("G")
-            self.G()
+            left = self.G(f"@{addr}")  # بخونیم از addr
             self.dedent()
             self.indent("D")
-            self.D()
+            dres = self.D(left)
             self.dedent()
             self.indent("C")
-            self.C()
+            cres = self.C(dres)
             self.dedent()
+            return cres  # مقدار نهایی expression مثل a[i] * 2 + 1
 
     def Simple_expression_zegond(self):
         self.indent("Additive-expression-zegond")
-        result = self.Additive_expression_zegond()
+        left = self.Additive_expression_zegond()
         self.dedent()
         self.indent("C")
-        self.C()
+        result = self.C(left)
         self.dedent()
         return result
 
     def Simple_expression_prime(self):
         self.indent("Additive-expression-prime")
-        self.Additive_expression_prime()
-        self.dedent()
-        self.indent("C")
-        self.C()
+        left = self.Additive_expression_prime()
         self.dedent()
 
-    def C(self):
+        self.indent("C")
+        result = self.C(left)
+        self.dedent()
+
+        return result
+
+    def C(self, left):
         if self.lookahead[1][1] in ("<", "=="):
             self.indent("Relop")
+            op = self.lookahead[1][1]  # "<" یا "=="
             self.Relop()
             self.dedent()
             self.indent("Additive-expression")
-            self.Additive_expression()
+            right = self.Additive_expression()  # مقدار سمت راست مقایسه
             self.dedent()
+            result = self.code_gen.new_temp()
+            tac_op = "LT" if op == "<" else "EQ"
+            self.code_gen.emit(tac_op, left, right, result)
+            return result
         else:
             self.indent("epsilon")
             self.dedent()
+            return left  # اگر اصلاً عملگر مقایسه نبود، همون عبارت قبلی رو برگردون
 
     def Relop(self):
         if self.lookahead[1][1] == "<":
@@ -444,19 +464,25 @@ class Parser:
 
     def Additive_expression(self):
         self.indent("Term")
-        self.Term()
+        left = self.Term()
         self.dedent()
+
         self.indent("D")
-        self.D()
+        result = self.D(left)
         self.dedent()
+
+        return result
 
     def Additive_expression_prime(self):
         self.indent("Term-prime")
-        self.Term_prime()
+        left = self.Term_prime()
         self.dedent()
+
         self.indent("D")
-        self.D()
+        result = self.D(left)
         self.dedent()
+
+        return result
 
     def Additive_expression_zegond(self):
         self.indent("Term-zegond")
@@ -513,20 +539,25 @@ class Parser:
 
     def Term_prime(self):
         self.indent("Factor-prime")
-        self.Factor_prime()
+        left = self.Factor_prime()
         self.dedent()
+
         self.indent("G")
-        self.G()
+        result = self.G(left)
         self.dedent()
+
+        return result
 
     def Term_zegond(self):
         self.indent("Factor-zegond")
-        num = self.Factor_zegond()
+        left = self.Factor_zegond()
         self.dedent()
+
         self.indent("G")
-        self.G()
+        result = self.G(left)
         self.dedent()
-        return num
+
+        return result
 
     def G(self, inherited=""):
         if self.lookahead[1][1] == "*":
@@ -570,86 +601,125 @@ class Parser:
 
     def Var_call_prime(self, name):
         if self.lookahead[1][1] == "(":
-            # برای توابع — فعلاً نیاز نداریم
             self.match("SYMBOL", "(")
             self.indent("Args")
-            self.Args()
+            args = self.Args()  # ← آرگومان‌ها رو بگیر
             self.dedent()
             self.match("SYMBOL", ")")
-            temp = self.code_gen.new_temp()
-            self.code_gen.emit("CALL", name, "", temp)
-            return temp
+
+            # ← تولید کد برای آرگومان‌ها
+            for arg in args:
+                self.code_gen.emit("ARG", arg, "", "")
+
+            ret_temp = self.code_gen.new_temp()
+            self.code_gen.emit("CALL", name, "", ret_temp)
+            return ret_temp
         else:
             self.indent("Var-prime")
-            self.Var_prime()
+            result = self.Var_prime(name)
             self.dedent()
-            addr = self.code_gen.get_var_address(name)
-            temp = self.code_gen.new_temp()
-            self.code_gen.emit("ASSIGN", addr, "", temp)
-            return temp
+            return result
 
-    def Var_prime(self):
+    def Var_prime(self, name):
         if self.lookahead[1][1] == "[":
             self.match("SYMBOL", "[")
             self.indent("Expression")
-            self.Expression()
+            index = self.Expression()
             self.dedent()
             self.match("SYMBOL", "]")
+
+            # offset = index * 4
+            offset = self.code_gen.new_temp()
+            self.code_gen.emit("MULT", index, "#4", offset)
+
+            base_addr = self.code_gen.get_var_address(f"{name}[0]")
+
+            effective_addr = self.code_gen.new_temp()
+            self.code_gen.emit("ADD", f"#{base_addr}", offset, effective_addr)
+
+            result = self.code_gen.new_temp()
+            self.code_gen.emit("ASSIGN", effective_addr, "", result)
+            return result
         else:
             self.indent("epsilon")
             self.dedent()
+            addr = self.code_gen.get_var_address(name)
+            temp = self.code_gen.new_temp()
+            self.code_gen.emit("ASSIGN", f"#{addr}", "", temp)
+            return temp
 
-    def Factor_prime(self):
+    def Factor_prime(self, name):
         if self.lookahead[1][1] == "(":
             self.match("SYMBOL", "(")
             self.indent("Args")
-            self.Args()
+            args = self.Args()
             self.dedent()
             self.match("SYMBOL", ")")
+
+            # تولید کد ARG برای هر آرگومان
+            for arg in args:
+                self.code_gen.emit("ARG", arg, "", "")
+
+            ret_temp = self.code_gen.new_temp()
+            self.code_gen.emit("CALL", name, "", ret_temp)
+            return ret_temp
         else:
             self.indent("epsilon")
             self.dedent()
 
-    def Factor_zegond(self):#TODO: complete it
+            addr = self.code_gen.get_var_address(name)
+            temp = self.code_gen.new_temp()
+            self.code_gen.emit("ASSIGN", f"#{addr}", "", temp)
+            return temp
+
+    def Factor_zegond(self):
         if self.lookahead[1][1] == "(":
             self.match("SYMBOL", "(")
             self.indent("Expression")
-            self.Expression()
+            result = self.Expression()  # ⬅️ مقدار حاصل داخل پرانتز
             self.dedent()
             self.match("SYMBOL", ")")
+            return result
+
         elif self.lookahead[1][0] == "NUM":
             value = self.lookahead[1][1]
             self.match("NUM")
-            return f"#{value}"  # عدد فوری
+            return f"#{value}"  # ⬅️ برگردوندن مقدار عددی فوری
+
         else:
             self.syntax_error("Expected '(' or NUM in Factor-zegond")
 
     def Args(self):
         if self.lookahead[1][1] != ")":
             self.indent("Arg-list")
-            self.Arg_list()
+            args = self.Arg_list()  # ← آرگومان‌ها رو بگیر
             self.dedent()
+            return args
         else:
             self.indent("epsilon")
             self.dedent()
+            return []
 
     def Arg_list(self):
         self.indent("Expression")
-        self.Expression()
+        arg = self.Expression()  # ← temp یا immediate
         self.dedent()
         self.indent("Arg-list-prime")
-        self.Arg_list_prime()
+        args = self.Arg_list_prime()
         self.dedent()
+        return [arg] + args
 
     def Arg_list_prime(self):
         if self.lookahead[1][1] == ",":
             self.match("SYMBOL", ",")
             self.indent("Expression")
-            self.Expression()
+            arg = self.Expression()
             self.dedent()
             self.indent("Arg-list-prime")
-            self.Arg_list_prime()
+            rest = self.Arg_list_prime()
             self.dedent()
+            return [arg] + rest
         else:
             self.indent("epsilon")
             self.dedent()
+            return []
