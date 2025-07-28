@@ -6,6 +6,7 @@ class CodeGenerator:
         self.symbol_table = {}  # نگهداری آدرس متغیرها
         self.jump_stack = []  # برای کنترل پرش‌ها (مثل repeat)
         self.program_block = []
+        self.label_counter = 0
 
     def new_temp(self):
         temp = self.temp_count
@@ -21,10 +22,7 @@ class CodeGenerator:
         self.program_block.append(code)
 
     def emit(self, op, arg1="", arg2="", result=""):
-        line = f"{self.line_no}\t({op}, {arg1}, {arg2}, {result})"
-        self.output.append(line)
-        self.line_no += 1
-        return self.line_no - 1  # شماره خط تولیدشده
+        self.output.append(f"({op}, {arg1}, {arg2}, {result})")
 
     def backpatch(self, line_no, label):
         old_line = self.output[line_no]
@@ -34,6 +32,11 @@ class CodeGenerator:
         new_line = f"{line_no}\t({parts[0]}, {parts[1]}, {parts[2]}, {parts[3]})"
         self.output[line_no] = new_line
 
+    def new_label(self):
+        label = f"L{self.label_counter}"
+        self.label_counter += 1
+        return label
+
     def write_output(self, filename="output.txt"):
         if not self.output:
             with open(filename, "w") as f:
@@ -41,7 +44,8 @@ class CodeGenerator:
                     f.write(f"{i}\t{line}\n")
         else:
             with open(filename, "w") as f:
-                f.write("\n".join(self.output))
+                for i, line in enumerate(self.output):
+                    f.write(f"{i}\t{line}\n")
         print("\nSymbol Table:")
         for name, addr in self.symbol_table.items():
             print(f"{name}: {addr}")

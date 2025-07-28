@@ -305,7 +305,9 @@ class Parser:
         elif self.lookahead[1][1] == ";":
             self.match("SYMBOL", ";")
         else:
+            self.indent("Expression")
             result = self.Expression()  # ← مقدار رو بگیر ولی نیاز نیست استفاده شه
+            self.dedent()
             self.match("SYMBOL", ";")
 
     def Selection_stmt(self):
@@ -324,6 +326,8 @@ class Parser:
         self.dedent()
 
     def Iteration_stmt(self):
+        loop_start = self.code_gen.new_label()
+        self.code_gen.emit("LABEL", loop_start, "", "")
         self.match("KEYWORD", "repeat")
         self.indent("Statement")
         self.Statement()
@@ -331,9 +335,10 @@ class Parser:
         self.match("KEYWORD", "until")
         self.match("SYMBOL", "(")
         self.indent("Expression")
-        self.Expression()
+        condition = self.Expression()
         self.dedent()
         self.match("SYMBOL", ")")
+        self.code_gen.emit("JPF", condition, loop_start, "")
 
     def Return_stmt(self):
         self.match("KEYWORD", "return")
@@ -344,11 +349,13 @@ class Parser:
     def Return_stmt_prime(self):
         if self.lookahead[1][1] != ";":
             self.indent("Expression")
-            self.Expression()
+            result = self.Expression()
             self.dedent()
             self.match("SYMBOL", ";")
+            self.code_gen.emit("RETURN", result, "", "")
         else:
             self.match("SYMBOL", ";")
+            self.code_gen.emit("RETURN", "", "", "")
 
     def Expression(self):
         if self.lookahead[1][0] == "NUM" or self.lookahead[1][1] == "(":
@@ -389,9 +396,9 @@ class Parser:
             self.dedent()
             return result
         else:
+            self.indent("Simple-expression-prime")
             result = self.Simple_expression_prime()
             return result
-
 
     def H(self, addr):  # ← آدرس محاسبه‌شده a[i] از B
         if self.lookahead[1][1] == "=":
@@ -645,7 +652,7 @@ class Parser:
             self.code_gen.emit("ASSIGN", f"#{addr}", "", temp)
             return temp
 
-    def Factor_prime(self, name):
+    def Factor_prime(self, name=""):
         if self.lookahead[1][1] == "(":
             self.match("SYMBOL", "(")
             self.indent("Args")
