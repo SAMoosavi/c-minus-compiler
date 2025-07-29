@@ -323,7 +323,7 @@ class Parser:
         self.match("SYMBOL", ")")
         else_label = self.code_gen.new_label()
         end_label = self.code_gen.new_label()
-        self.code_gen.emit("JPF", cond, else_label, "")  # ← اگر شرط برقرار نبود برو else
+        self.code_gen.emit("JPF", cond, else_label, "")
         self.indent("Statement")
         self.Statement()  # ← then
         self.dedent()
@@ -335,7 +335,6 @@ class Parser:
         self.dedent()
 
         self.code_gen.emit("LABEL", end_label, "", "")
-
 
     def Iteration_stmt(self):
         loop_start = self.code_gen.new_label()
@@ -489,7 +488,7 @@ class Parser:
 
         return result
 
-    def Additive_expression_prime(self,name):
+    def Additive_expression_prime(self, name):
         self.indent("Term-prime")
         left = self.Term_prime(name)
         self.dedent()
@@ -623,10 +622,17 @@ class Parser:
             self.dedent()
             self.match("SYMBOL", ")")
 
-            # ← تولید کد برای آرگومان‌ها
+            # اگر تابع output هست → PRINT تولید کن
+            if name == "output":
+                if len(args) != 1:
+                    self.syntax_error("output takes exactly one argument")
+                    return None
+                self.code_gen.emit("PRINT", args[0], "", "")
+                return None  # چون output مقداری برنمی‌گرداند
+
+            # برای توابع دیگر: ARG + CALL
             for arg in args:
                 self.code_gen.emit("ARG", arg, "", "")
-
             ret_temp = self.code_gen.new_temp()
             self.code_gen.emit("CALL", name, "", ret_temp)
             return ret_temp
@@ -674,7 +680,15 @@ class Parser:
             self.dedent()
             self.match("SYMBOL", ")")
 
-            # تولید کد ARG برای هر آرگومان
+            # بررسی: اگر output باشه، PRINT تولید کن
+            if name == "output":
+                if len(args) != 1:
+                    self.syntax_error("output must take exactly one argument")
+                    return None
+                self.code_gen.emit("PRINT", args[0], "", "")
+                return None  # چون خروجی نداره
+
+            # تابع معمولی
             for arg in args:
                 self.code_gen.emit("ARG", arg, "", "")
 
@@ -687,7 +701,7 @@ class Parser:
 
             addr = self.code_gen.get_var_address(name)
             temp = self.code_gen.new_temp()
-            self.code_gen.emit("ASSIGN", f"#{addr}", "", temp)
+            self.code_gen.emit("ASSIGN", f"@{addr}", "", temp)
             return temp
 
     def Factor_zegond(self):
