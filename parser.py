@@ -9,6 +9,23 @@ class Parser:
         self.indent_level = 0
         self.syntax_errors = ""
         self.code_gen = CodeGenerator()
+        self.semantic_errors = []
+        self.current_function_name = None
+        self.param_counter = 0
+        self.function_param_count = {}
+        self.in_repeat_stack = []
+
+    def report_semantic_error(self, lineno, message):
+        error = f"#{lineno}: Semantic Error! {message}"
+        self.semantic_errors.append(error)
+
+    def write_semantic_errors(self):
+        with open("semantic_errors.txt", "w") as f:
+            if self.semantic_errors:
+                for error in self.semantic_errors:
+                    f.write(error + "\n")
+            else:
+                f.write("The program is semantically correct.\n")
 
     def parse_tree(self):
         lines = self.output
@@ -123,6 +140,16 @@ class Parser:
         self.indent("$")
         self.dedent()
         self.dedent()
+        # نوشتن فایل خطای معنایی
+        self.write_semantic_errors()
+
+        # اگر خطای معنایی داریم، کد خروجی تولید نشه
+        if self.semantic_errors:
+            with open("output.txt", "w") as f:
+                f.write("The output code has not been generated\n")
+        else:
+            self.code_gen.write_output()
+
         tree = "\n".join(self.print_tree(self.parse_tree()["Program"]))
         return f"Program\n{tree}", self.syntax_errors
 
@@ -166,6 +193,9 @@ class Parser:
             self.Fun_declaration_prime()
             self.dedent()
         else:
+            if self.last_decl_type == "void":
+                lineno = self.lookahead[0]
+                self.report_semantic_error(lineno, "Illegal type of void for variable")
             self.indent("Var-declaration-prime")
             self.Var_declaration_prime()
             self.dedent()
@@ -190,22 +220,27 @@ class Parser:
             self.code_gen.get_var_address(self.var_name)
 
     def Fun_declaration_prime(self):
+        self.current_function_name = self.var_name
         self.match("SYMBOL", "(")
         self.indent("Params")
         self.Params()
         self.dedent()
         self.match("SYMBOL", ")")
         self.indent("Compound-stmt")
+        self.function_param_count[self.current_function_name] = self.param_counter
         self.Compound_stmt()
         self.dedent()
 
     def Type_specifier(self):
+        lineno = self.lookahead[0]
         if self.lookahead[1][1] in ("int", "void"):
+            self.last_decl_type = self.lookahead[1][1]  # ← این خط رو اضافه کن
             self.match("KEYWORD")
         else:
             self.syntax_error("Expected type specifier")
 
     def Params(self):
+        self.param_counter = 0
         if self.lookahead[1][1] == "void":
             self.match("KEYWORD", "void")
         else:
@@ -243,12 +278,12 @@ class Parser:
         if self.lookahead[1][1] == "[":
             self.match("SYMBOL", "[")
             self.match("SYMBOL", "]")
-
+            self.param_counter += 1
             self.code_gen.get_var_address(self.var_name + "[]")
         else:
             self.indent("epsilon")
             self.dedent()
-
+            self.param_counter += 1
             self.code_gen.get_var_address(self.var_name)
 
     def Compound_stmt(self):
@@ -303,6 +338,9 @@ class Parser:
 
     def Expression_stmt(self):
         if self.lookahead[1][1] == "break":
+            lineno = self.lookahead[0]
+            if not self.in_repeat_stack:
+                self.report_semantic_error(lineno, "No 'repeat ... until' found for 'break'")
             self.match("KEYWORD", "break")
             self.match("SYMBOL", ";")
         elif self.lookahead[1][1] == ";":
@@ -348,18 +386,27 @@ class Parser:
     def Iteration_stmt(self):
         loop_start_line = len(self.code_gen.output)
 
+        self.in_repeat_stack.append(True)  # ✅ وارد بلاک repeat شدیم
+
         self.match("KEYWORD", "repeat")
+
         self.indent("Statement")
         self.Statement()
         self.dedent()
+
         self.match("KEYWORD", "until")
         self.match("SYMBOL", "(")
+
         self.indent("Expression")
         condition = self.Expression()
         self.dedent()
+
         self.match("SYMBOL", ")")
 
         self.code_gen.emit("JPF", condition, loop_start_line, "")
+
+        self.in_repeat_stack.pop()  # ✅ از بلاک repeat خارج شدیم
+
 
     def Return_stmt(self):
         self.match("KEYWORD", "return")
@@ -398,7 +445,12 @@ class Parser:
             self.indent("Expression")
             rhs_addr = self.Expression()
             self.dedent()
-            addr = self.code_gen.get_var_address(var_name)
+            lineno = self.lookahead[0]
+            if var_name not in self.code_gen.symbol_table:
+                self.report_semantic_error(lineno, f"'{var_name}' is not defined")
+                addr = "#-1"
+            else:
+                addr = self.code_gen.symbol_table[var_name]
             self.code_gen.emit("ASSIGN", rhs_addr, addr, "")
             return addr
         elif self.lookahead[1][1] == "[":
@@ -630,6 +682,13 @@ class Parser:
             self.match("SYMBOL", "(")
             self.indent("Args")
             args = self.Args()
+            if name in self.function_param_count:
+                expected = self.function_param_count[name]
+                actual = len(args)
+                if actual != expected:
+                    lineno = self.lookahead[0]
+                    self.report_semantic_error(lineno, f"Mismatch in numbers of arguments of '{name}'")
+
             self.dedent()
             self.match("SYMBOL", ")")
 
@@ -674,7 +733,12 @@ class Parser:
             self.indent("epsilon")
             self.dedent()
 
-            addr = self.code_gen.get_var_address(name)
+            if name not in self.code_gen.symbol_table:
+                self.report_semantic_error(self.lookahead[0], f"'{name}' is not defined")
+                addr = "#-1"  # آدرس نامعتبر برای ادامه‌ی تولید کد
+            else:
+                addr = self.code_gen.symbol_table[name]
+
             temp = self.code_gen.new_temp()
             self.code_gen.emit("ASSIGN", addr, temp, "")
             return temp
@@ -684,6 +748,13 @@ class Parser:
             self.match("SYMBOL", "(")
             self.indent("Args")
             args = self.Args()
+            if name in self.function_param_count:
+                expected = self.function_param_count[name]
+                actual = len(args)
+                if actual != expected:
+                    lineno = self.lookahead[0]
+                    self.report_semantic_error(lineno, f"Mismatch in numbers of arguments of '{name}'")
+
             self.dedent()
             self.match("SYMBOL", ")")
 
@@ -704,7 +775,12 @@ class Parser:
             self.indent("epsilon")
             self.dedent()
 
-            addr = self.code_gen.get_var_address(name)
+            if name not in self.code_gen.symbol_table:
+                self.report_semantic_error(self.lookahead[0], f"'{name}' is not defined")
+                addr = "#-1"
+            else:
+                addr = self.code_gen.symbol_table[name]
+
             temp = self.code_gen.new_temp()
             self.code_gen.emit("ASSIGN", addr, temp, "")
             return temp

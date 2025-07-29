@@ -14,13 +14,4 @@ int main(void){
       output(arr[i]);
       i = i + 1;
     }until(4 < i)
-
-    if (i == 10)
-    {
-      output(arr[2 * (3 + 5) - 12]);
-    }
-    else
-    {
-      output(arr[2 * (3 + 5) - 14]);
-    }
 }
