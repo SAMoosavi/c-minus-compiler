@@ -404,7 +404,7 @@ class Parser:
             addr = self.code_gen.new_temp()
             self.code_gen.emit("ADD", f"#{base_addr}", offset, addr)
             self.indent("H")
-            result = self.H(addr)
+            result = self.H(f"@{addr}")
             self.dedent()
             return result
         else:
@@ -661,7 +661,7 @@ class Parser:
             self.code_gen.emit("ADD", f"#{base_addr}", offset, effective_addr)
 
             temp = self.code_gen.new_temp()
-            self.code_gen.emit("ASSIGN", effective_addr, temp, "")
+            self.code_gen.emit("ASSIGN", f"@{effective_addr}", "", temp)
             return temp
         else:
             self.indent("epsilon")
