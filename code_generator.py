@@ -1,18 +1,17 @@
 class CodeGenerator:
     def __init__(self):
-        self.output = []  # list of tuples (op, arg1, arg2, result)
+        self.output = []
         self.temp_count = 500
         self.symbol_table = {}
-        self.break_target_stack = []  # stack for nested repeat-until
-        self.break_jumps = []  # stack of lists for break jump indices
+        self.break_target_stack = []
+        self.break_jumps = []
 
     def emit(self, op, arg1="", arg2="", result=""):
         line_no = len(self.output)
 
-        # Track break jumps needing backpatch
         if op == "JP" and arg1 == "TO_BE_FILLED":
             if not self.break_jumps:
-                self.break_jumps.append([])  # ensure at least one level exists
+                self.break_jumps.append([])
             self.break_jumps[-1].append(line_no)
 
         self.output.append(f"({op}, {arg1}, {arg2}, {result})")

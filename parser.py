@@ -140,10 +140,8 @@ class Parser:
         self.indent("$")
         self.dedent()
         self.dedent()
-        # نوشتن فایل خطای معنایی
         self.write_semantic_errors()
 
-        # اگر خطای معنایی داریم، کد خروجی تولید نشه
         if self.semantic_errors:
             with open("output.txt", "w") as f:
                 f.write("The output code has not been generated\n")
@@ -234,7 +232,7 @@ class Parser:
     def Type_specifier(self):
         lineno = self.lookahead[0]
         if self.lookahead[1][1] in ("int", "void"):
-            self.last_decl_type = self.lookahead[1][1]  # ← این خط رو اضافه کن
+            self.last_decl_type = self.lookahead[1][1]
             self.match("KEYWORD")
         else:
             self.syntax_error("Expected type specifier")
@@ -338,10 +336,11 @@ class Parser:
 
     def Expression_stmt(self):
         if self.lookahead[1][1] == "break":
-            lineno = self.lookahead[0]
-
             if not self.code_gen.break_target_stack:
-                self.report_semantic_error(lineno, "No 'repeat ... until' found for 'break'")
+                lineno = self.lookahead[0]
+                self.report_semantic_error(
+                    lineno, "No 'repeat ... until' found for 'break'"
+                )
                 self.match("KEYWORD", "break")
                 self.match("SYMBOL", ";")
                 return
@@ -394,8 +393,8 @@ class Parser:
     def Iteration_stmt(self):
         loop_start_line = len(self.code_gen.output)
 
-        self.in_repeat_stack.append(True)  # برای بررسی معتبر بودن break
-        self.code_gen.break_target_stack.append("TO_BE_FILLED")  # مقصد پرش break‌ها
+        self.in_repeat_stack.append(True)
+        self.code_gen.break_target_stack.append("TO_BE_FILLED")
 
         self.match("KEYWORD", "repeat")
 
@@ -414,7 +413,6 @@ class Parser:
 
         self.code_gen.emit("JPF", condition, loop_start_line, "")
 
-        # تعیین مقصد break‌ها به خط بعدی (بعد از حلقه)
         break_target = len(self.code_gen.output)
         self.code_gen.resolve_breaks(break_target)
 
@@ -458,8 +456,8 @@ class Parser:
             self.indent("Expression")
             rhs_addr = self.Expression()
             self.dedent()
-            lineno = self.lookahead[0]
             if var_name not in self.code_gen.symbol_table:
+                lineno = self.lookahead[0]
                 self.report_semantic_error(lineno, f"'{var_name}' is not defined")
                 addr = "#-1"
             else:
@@ -700,7 +698,9 @@ class Parser:
                 actual = len(args)
                 if actual != expected:
                     lineno = self.lookahead[0]
-                    self.report_semantic_error(lineno, f"Mismatch in numbers of arguments of '{name}'")
+                    self.report_semantic_error(
+                        lineno, f"Mismatch in numbers of arguments of '{name}'"
+                    )
 
             self.dedent()
             self.match("SYMBOL", ")")
@@ -747,8 +747,9 @@ class Parser:
             self.dedent()
 
             if name not in self.code_gen.symbol_table:
-                self.report_semantic_error(self.lookahead[0], f"'{name}' is not defined")
-                addr = "#-1"  # آدرس نامعتبر برای ادامه‌ی تولید کد
+                lineno = self.lookahead[0]
+                self.report_semantic_error(lineno, f"'{name}' is not defined")
+                addr = "#-1"
             else:
                 addr = self.code_gen.symbol_table[name]
 
@@ -766,7 +767,9 @@ class Parser:
                 actual = len(args)
                 if actual != expected:
                     lineno = self.lookahead[0]
-                    self.report_semantic_error(lineno, f"Mismatch in numbers of arguments of '{name}'")
+                    self.report_semantic_error(
+                        lineno, f"Mismatch in numbers of arguments of '{name}'"
+                    )
 
             self.dedent()
             self.match("SYMBOL", ")")
@@ -789,7 +792,8 @@ class Parser:
             self.dedent()
 
             if name not in self.code_gen.symbol_table:
-                self.report_semantic_error(self.lookahead[0], f"'{name}' is not defined")
+                lineno = self.lookahead[0]
+                self.report_semantic_error(lineno, f"'{name}' is not defined")
                 addr = "#-1"
             else:
                 addr = self.code_gen.symbol_table[name]
