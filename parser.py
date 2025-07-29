@@ -157,7 +157,7 @@ class Parser:
         self.dedent()
 
         if self.lookahead[1][0] == "ID":
-            self.var_name = self.lookahead[1][1]  # ⬅️ ذخیره اسم متغیر برای مراحل بعد
+            self.var_name = self.lookahead[1][1]
         self.match("ID")
 
     def Declaration_prime(self):
@@ -176,18 +176,17 @@ class Parser:
             if self.lookahead[1][0] == "NUM":
                 size = int(self.lookahead[1][1])
             else:
-                size = 1  # fallback
+                size = 1
             self.match("NUM")
             self.match("SYMBOL", "]")
             self.match("SYMBOL", ";")
-            # ⬅️ Action Symbol برای آرایه
+
             for i in range(size):
                 name = f"{self.var_name}[{i}]"
                 self.code_gen.get_var_address(name)
         else:
             self.match("SYMBOL", ";")
 
-            # ⬅️ Action Symbol برای متغیر معمولی
             self.code_gen.get_var_address(self.var_name)
 
     def Fun_declaration_prime(self):
@@ -244,12 +243,12 @@ class Parser:
         if self.lookahead[1][1] == "[":
             self.match("SYMBOL", "[")
             self.match("SYMBOL", "]")
-            # ثبت به عنوان آرایه (به عنوان اشاره‌گر)
+
             self.code_gen.get_var_address(self.var_name + "[]")
         else:
             self.indent("epsilon")
             self.dedent()
-            # ثبت پارامتر معمولی
+
             self.code_gen.get_var_address(self.var_name)
 
     def Compound_stmt(self):
@@ -310,7 +309,7 @@ class Parser:
             self.match("SYMBOL", ";")
         else:
             self.indent("Expression")
-            result = self.Expression()  # ← مقدار رو بگیر ولی نیاز نیست استفاده شه
+            _ = self.Expression()
             self.dedent()
             self.match("SYMBOL", ";")
 
@@ -319,39 +318,35 @@ class Parser:
         self.match("SYMBOL", "(")
 
         self.indent("Expression")
-        cond = self.Expression()  # تولید کد شرط if
+        cond = self.Expression()
         self.dedent()
 
         self.match("SYMBOL", ")")
 
-        # رزرو جایگاه JPF → مقصد بعداً پر می‌شود
         jpf_index = len(self.code_gen.output)
-        self.code_gen.emit("JPF", cond, "", "")  # مقصد ← شروع else
+        self.code_gen.emit("JPF", cond, "", "")
 
         self.indent("Statement")
-        self.Statement()  # then block
+        self.Statement()
         self.dedent()
 
-        # رزرو جایگاه JP برای پرش از then به بعد از else
         jp_index = len(self.code_gen.output)
-        self.code_gen.emit("JP", "", "", "")  # مقصد ← بعد از else
+        self.code_gen.emit("JP", "", "", "")
 
-        # جایگزینی مقصد JPF با خط شروع else
         else_line = len(self.code_gen.output)
         self.code_gen.output[jpf_index] = f"(JPF, {cond}, {else_line}, )"
 
         self.match("KEYWORD", "else")
 
         self.indent("Statement")
-        self.Statement()  # else block
+        self.Statement()
         self.dedent()
 
-        # جایگزینی مقصد JP با خط بعد از else
         after_else_line = len(self.code_gen.output)
         self.code_gen.output[jp_index] = f"(JP, {after_else_line}, , )"
 
     def Iteration_stmt(self):
-        loop_start_line = len(self.code_gen.output)  # ← موقعیت شروع حلقه
+        loop_start_line = len(self.code_gen.output)
 
         self.match("KEYWORD", "repeat")
         self.indent("Statement")
@@ -364,7 +359,6 @@ class Parser:
         self.dedent()
         self.match("SYMBOL", ")")
 
-        # پرش در صورت false بودن شرط ← به ابتدای حلقه
         self.code_gen.emit("JPF", condition, loop_start_line, "")
 
     def Return_stmt(self):
@@ -391,10 +385,10 @@ class Parser:
             self.dedent()
             return result
         else:
-            var_name = self.lookahead[1][1]  # ذخیره ID برای رجوع بعدی
+            var_name = self.lookahead[1][1]
             self.match("ID")
             self.indent("B")
-            result = self.B(var_name)  # تابع جدید
+            result = self.B(var_name)
             self.dedent()
             return result
 
@@ -405,15 +399,15 @@ class Parser:
             rhs_addr = self.Expression()
             self.dedent()
             addr = self.code_gen.get_var_address(var_name)
-            self.code_gen.emit("ASSIGN", rhs_addr, addr, "")  # ✅ اصلاح شده
+            self.code_gen.emit("ASSIGN", rhs_addr, addr, "")
             return addr
         elif self.lookahead[1][1] == "[":
             self.match("SYMBOL", "[")
             self.indent("Expression")
-            index = self.Expression()  # i
+            index = self.Expression()
             self.dedent()
             self.match("SYMBOL", "]")
-            # offset = index * 4
+
             offset = self.code_gen.new_temp()
             self.code_gen.emit("MULT", index, "#4", offset)
             base_addr = self.code_gen.get_var_address(f"{var_name}[0]")
@@ -429,17 +423,17 @@ class Parser:
             self.dedent()
             return result
 
-    def H(self, addr):  # ← آدرس محاسبه‌شده a[i] از B
+    def H(self, addr):
         if self.lookahead[1][1] == "=":
             self.match("SYMBOL", "=")
             self.indent("Expression")
-            value = self.Expression()  # مقدار سمت راست
+            value = self.Expression()
             self.dedent()
             self.code_gen.emit("ASSIGN", value, addr, "")
             return None
         else:
             self.indent("G")
-            left = self.G(addr)  # بخونیم از addr
+            left = self.G(addr)
             self.dedent()
             self.indent("D")
             dres = self.D(left)
@@ -447,7 +441,7 @@ class Parser:
             self.indent("C")
             cres = self.C(dres)
             self.dedent()
-            return cres  # مقدار نهایی expression مثل a[i] * 2 + 1
+            return cres
 
     def Simple_expression_zegond(self):
         self.indent("Additive-expression-zegond")
@@ -472,11 +466,11 @@ class Parser:
     def C(self, left):
         if self.lookahead[1][1] in ("<", "=="):
             self.indent("Relop")
-            op = self.lookahead[1][1]  # "<" یا "=="
+            op = self.lookahead[1][1]
             self.Relop()
             self.dedent()
             self.indent("Additive-expression")
-            right = self.Additive_expression()  # مقدار سمت راست مقایسه
+            right = self.Additive_expression()
             self.dedent()
             result = self.code_gen.new_temp()
             tac_op = "LT" if op == "<" else "EQ"
@@ -485,7 +479,7 @@ class Parser:
         else:
             self.indent("epsilon")
             self.dedent()
-            return left  # اگر اصلاً عملگر مقایسه نبود، همون عبارت قبلی رو برگردون
+            return left
 
     def Relop(self):
         if self.lookahead[1][1] == "<":
@@ -519,10 +513,10 @@ class Parser:
 
     def Additive_expression_zegond(self):
         self.indent("Term-zegond")
-        left = self.Term_zegond()  # مقدار سمت چپ (مثلاً a)
+        left = self.Term_zegond()
         self.dedent()
         self.indent("D")
-        result = self.D(left)  # ادامهٔ جمع/تفریق رو انجام بده
+        result = self.D(left)
         self.dedent()
         return result
 
@@ -534,16 +528,15 @@ class Parser:
             self.dedent()
 
             self.indent("Term")
-            right = self.Term()  # باید مقدار رو از Term بگیریم
+            right = self.Term()
             self.dedent()
 
-            # تولید کد ۳آدرسی
             result = self.code_gen.new_temp()
             tac_op = "ADD" if op == "+" else "SUB"
             self.code_gen.emit(tac_op, inherited, right, result)
 
             self.indent("D")
-            result = self.D(result)  # بازگشت با نتیجه جدید
+            result = self.D(result)
             self.dedent()
             return result
         else:
@@ -621,13 +614,13 @@ class Parser:
             name = self.lookahead[1][1]
             self.match("ID")
             self.indent("Var-call-prime")
-            result = self.Var_call_prime(name)  # اسم متغیر رو پاس می‌دیم
+            result = self.Var_call_prime(name)
             self.dedent()
             return result
         elif self.lookahead[1][0] == "NUM":
             value = self.lookahead[1][1]
             self.match("NUM")
-            return f"#{value}"  # عدد فوری
+            return f"#{value}"
         else:
             self.syntax_error("Invalid factor")
             return None
@@ -636,19 +629,17 @@ class Parser:
         if self.lookahead[1][1] == "(":
             self.match("SYMBOL", "(")
             self.indent("Args")
-            args = self.Args()  # ← آرگومان‌ها رو بگیر
+            args = self.Args()
             self.dedent()
             self.match("SYMBOL", ")")
 
-            # اگر تابع output هست → PRINT تولید کن
             if name == "output":
                 if len(args) != 1:
                     self.syntax_error("output takes exactly one argument")
                     return None
                 self.code_gen.emit("PRINT", args[0], "", "")
-                return None  # چون output مقداری برنمی‌گرداند
+                return None
 
-            # برای توابع دیگر: ARG + CALL
             for arg in args:
                 self.code_gen.emit("ARG", arg, "", "")
             ret_temp = self.code_gen.new_temp()
@@ -696,15 +687,13 @@ class Parser:
             self.dedent()
             self.match("SYMBOL", ")")
 
-            # بررسی: اگر output باشه، PRINT تولید کن
             if name == "output":
                 if len(args) != 1:
                     self.syntax_error("output must take exactly one argument")
                     return None
                 self.code_gen.emit("PRINT", args[0], "", "")
-                return None  # چون خروجی نداره
+                return None
 
-            # تابع معمولی
             for arg in args:
                 self.code_gen.emit("ARG", arg, "", "")
 
@@ -724,21 +713,21 @@ class Parser:
         if self.lookahead[1][1] == "(":
             self.match("SYMBOL", "(")
             self.indent("Expression")
-            result = self.Expression()  # ⬅️ مقدار حاصل داخل پرانتز
+            result = self.Expression()
             self.dedent()
             self.match("SYMBOL", ")")
             return result
         elif self.lookahead[1][0] == "NUM":
             value = self.lookahead[1][1]
             self.match("NUM")
-            return f"#{value}"  # ⬅️ برگردوندن مقدار عددی فوری
+            return f"#{value}"
         else:
             self.syntax_error("Expected '(' or NUM in Factor-zegond")
 
     def Args(self):
         if self.lookahead[1][1] != ")":
             self.indent("Arg-list")
-            args = self.Arg_list()  # ← آرگومان‌ها رو بگیر
+            args = self.Arg_list()
             self.dedent()
             return args
         else:
@@ -748,7 +737,7 @@ class Parser:
 
     def Arg_list(self):
         self.indent("Expression")
-        arg = self.Expression()  # ← temp یا immediate
+        arg = self.Expression()
         self.dedent()
         self.indent("Arg-list-prime")
         args = self.Arg_list_prime()
