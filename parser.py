@@ -388,8 +388,9 @@ class Parser:
             self.indent("Expression")
             rhs_addr = self.Expression()
             self.dedent()
-            self.code_gen.emit("ASSIGN", rhs_addr, "", var_name)  # ✅ اصلاح شده
-            return var_name
+            addr = self.code_gen.get_var_address(var_name)
+            self.code_gen.emit("ASSIGN", rhs_addr, addr, "")  # ✅ اصلاح شده
+            return addr
         elif self.lookahead[1][1] == "[":
             self.match("SYMBOL", "[")
             self.indent("Expression")
@@ -409,6 +410,7 @@ class Parser:
         else:
             self.indent("Simple-expression-prime")
             result = self.Simple_expression_prime(var_name)
+            self.dedent()
             return result
 
     def H(self, addr):  # ← آدرس محاسبه‌شده a[i] از B
@@ -417,11 +419,11 @@ class Parser:
             self.indent("Expression")
             value = self.Expression()  # مقدار سمت راست
             self.dedent()
-            self.code_gen.emit("ASSIGN", value, f"@{addr}", "")
+            self.code_gen.emit("ASSIGN", value, addr, "")
             return None
         else:
             self.indent("G")
-            left = self.G(f"@{addr}")  # بخونیم از addr
+            left = self.G(addr)  # بخونیم از addr
             self.dedent()
             self.indent("D")
             dres = self.D(left)
@@ -658,21 +660,19 @@ class Parser:
             effective_addr = self.code_gen.new_temp()
             self.code_gen.emit("ADD", f"#{base_addr}", offset, effective_addr)
 
-            # مقدار در addr را بخوان
             temp = self.code_gen.new_temp()
-            self.code_gen.emit("ASSIGN", f"@{effective_addr}", "", temp)
+            self.code_gen.emit("ASSIGN", effective_addr, temp, "")
             return temp
         else:
             self.indent("epsilon")
             self.dedent()
 
-            # مقدار متغیر ساده را بخوان
             addr = self.code_gen.get_var_address(name)
             temp = self.code_gen.new_temp()
-            self.code_gen.emit("ASSIGN", f"@{addr}", "", temp)
+            self.code_gen.emit("ASSIGN", addr, temp, "")
             return temp
 
-    def Factor_prime(self, name=""):
+    def Factor_prime(self, name):
         if self.lookahead[1][1] == "(":
             self.match("SYMBOL", "(")
             self.indent("Args")
@@ -701,7 +701,7 @@ class Parser:
 
             addr = self.code_gen.get_var_address(name)
             temp = self.code_gen.new_temp()
-            self.code_gen.emit("ASSIGN", f"@{addr}", "", temp)
+            self.code_gen.emit("ASSIGN", addr, temp,"" )
             return temp
 
     def Factor_zegond(self):
@@ -712,12 +712,10 @@ class Parser:
             self.dedent()
             self.match("SYMBOL", ")")
             return result
-
         elif self.lookahead[1][0] == "NUM":
             value = self.lookahead[1][1]
             self.match("NUM")
             return f"#{value}"  # ⬅️ برگردوندن مقدار عددی فوری
-
         else:
             self.syntax_error("Expected '(' or NUM in Factor-zegond")
 
