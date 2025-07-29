@@ -339,10 +339,18 @@ class Parser:
     def Expression_stmt(self):
         if self.lookahead[1][1] == "break":
             lineno = self.lookahead[0]
-            if not self.in_repeat_stack:
+
+            if not self.code_gen.break_target_stack:
                 self.report_semantic_error(lineno, "No 'repeat ... until' found for 'break'")
+                self.match("KEYWORD", "break")
+                self.match("SYMBOL", ";")
+                return
+
             self.match("KEYWORD", "break")
             self.match("SYMBOL", ";")
+
+            break_target = self.code_gen.break_target_stack[-1]
+            self.code_gen.emit("JP", break_target, "", "")
         elif self.lookahead[1][1] == ";":
             self.match("SYMBOL", ";")
         else:
@@ -386,7 +394,8 @@ class Parser:
     def Iteration_stmt(self):
         loop_start_line = len(self.code_gen.output)
 
-        self.in_repeat_stack.append(True)  # ✅ وارد بلاک repeat شدیم
+        self.in_repeat_stack.append(True)  # برای بررسی معتبر بودن break
+        self.code_gen.break_target_stack.append("TO_BE_FILLED")  # مقصد پرش break‌ها
 
         self.match("KEYWORD", "repeat")
 
@@ -405,8 +414,12 @@ class Parser:
 
         self.code_gen.emit("JPF", condition, loop_start_line, "")
 
-        self.in_repeat_stack.pop()  # ✅ از بلاک repeat خارج شدیم
+        # تعیین مقصد break‌ها به خط بعدی (بعد از حلقه)
+        break_target = len(self.code_gen.output)
+        self.code_gen.resolve_breaks(break_target)
 
+        self.in_repeat_stack.pop()
+        self.code_gen.break_target_stack.pop()
 
     def Return_stmt(self):
         self.match("KEYWORD", "return")
