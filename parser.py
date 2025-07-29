@@ -317,28 +317,42 @@ class Parser:
     def Selection_stmt(self):
         self.match("KEYWORD", "if")
         self.match("SYMBOL", "(")
+
         self.indent("Expression")
-        cond = self.Expression()  # ← شرط را ارزیابی کن و مقدار برگشتی بگیر (temp)
-        self.dedent()
-        self.match("SYMBOL", ")")
-        else_label = self.code_gen.new_label()
-        end_label = self.code_gen.new_label()
-        self.code_gen.emit("JPF", cond, else_label, "")
-        self.indent("Statement")
-        self.Statement()  # ← then
-        self.dedent()
-        self.code_gen.emit("JP", end_label, "", "")  # ← بعد از then برو انتهای if
-        self.code_gen.emit("LABEL", else_label, "", "")
-        self.match("KEYWORD", "else")
-        self.indent("Statement")
-        self.Statement()  # ← else
+        cond = self.Expression()  # تولید کد شرط if
         self.dedent()
 
-        self.code_gen.emit("LABEL", end_label, "", "")
+        self.match("SYMBOL", ")")
+
+        # رزرو جایگاه JPF → مقصد بعداً پر می‌شود
+        jpf_index = len(self.code_gen.output)
+        self.code_gen.emit("JPF", cond, "", "")  # مقصد ← شروع else
+
+        self.indent("Statement")
+        self.Statement()  # then block
+        self.dedent()
+
+        # رزرو جایگاه JP برای پرش از then به بعد از else
+        jp_index = len(self.code_gen.output)
+        self.code_gen.emit("JP", "", "", "")  # مقصد ← بعد از else
+
+        # جایگزینی مقصد JPF با خط شروع else
+        else_line = len(self.code_gen.output)
+        self.code_gen.output[jpf_index] = f"(JPF, {cond}, {else_line}, )"
+
+        self.match("KEYWORD", "else")
+
+        self.indent("Statement")
+        self.Statement()  # else block
+        self.dedent()
+
+        # جایگزینی مقصد JP با خط بعد از else
+        after_else_line = len(self.code_gen.output)
+        self.code_gen.output[jp_index] = f"(JP, {after_else_line}, , )"
 
     def Iteration_stmt(self):
-        loop_start = self.code_gen.new_label()
-        self.code_gen.emit("LABEL", loop_start, "", "")
+        loop_start_line = len(self.code_gen.output)  # ← موقعیت شروع حلقه
+
         self.match("KEYWORD", "repeat")
         self.indent("Statement")
         self.Statement()
@@ -349,7 +363,9 @@ class Parser:
         condition = self.Expression()
         self.dedent()
         self.match("SYMBOL", ")")
-        self.code_gen.emit("JPF", condition, loop_start, "")
+
+        # پرش در صورت false بودن شرط ← به ابتدای حلقه
+        self.code_gen.emit("JPF", condition, loop_start_line, "")
 
     def Return_stmt(self):
         self.match("KEYWORD", "return")
@@ -701,7 +717,7 @@ class Parser:
 
             addr = self.code_gen.get_var_address(name)
             temp = self.code_gen.new_temp()
-            self.code_gen.emit("ASSIGN", addr, temp,"" )
+            self.code_gen.emit("ASSIGN", addr, temp, "")
             return temp
 
     def Factor_zegond(self):
